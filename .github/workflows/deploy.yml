@@ -1,0 +1,75 @@
+name: Deploy Frontend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: terraterri-454406
+  REGION: asia-south1
+  SERVICE_NAME: builder-admin-terraterri-com
+  REPOSITORY: builder-admin-terraterri-com
+  IMAGE_NAME: asia-south1-docker.pkg.dev/terraterri-454406/builder-admin-terraterri-com/builder-admin-terraterri-com:${{ github.sha }}
+
+  VITE_USER_ENDPOINT: https://micro-api-one.terraterri.com
+  VITE_SERVICES_ENDPOINT: https://micro-api-two.terraterri.com
+  VITE_MASTERS_ENDPOINT: https://micro-api-three.terraterri.com
+  VITE_WEBSITE_ENDPOINT: https://nodeapi.terraterri.com
+  VITE_EXPOADMIN_ENDPOINT: https://expoadminapi.terraterri.com/
+  VITE_EXPOAPI_ENDPOINT: https://expoadminapi.terraterri.com/tt-expo-builder-be/
+  VITE_BASE_URL: https://builder.admin.terraterri.com/
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication
+        run: |
+          gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
+
+      - name: Create .env.production
+        run: |
+          echo "VITE_USER_ENDPOINT=$VITE_USER_ENDPOINT" >> .env.production
+          echo "VITE_SERVICES_ENDPOINT=$VITE_SERVICES_ENDPOINT" >> .env.production
+          echo "VITE_MASTERS_ENDPOINT=$VITE_MASTERS_ENDPOINT" >> .env.production
+          echo "VITE_WEBSITE_ENDPOINT=$VITE_WEBSITE_ENDPOINT" >> .env.production
+          echo "VITE_EXPOADMIN_ENDPOINT=$VITE_EXPOADMIN_ENDPOINT" >> .env.production
+          echo "VITE_EXPOAPI_ENDPOINT=$VITE_EXPOAPI_ENDPOINT" >> .env.production
+          echo "VITE_BASE_URL=$VITE_BASE_URL" >> .env.production
+
+      - name: Build Docker image
+        run: |
+          docker build -t $IMAGE_NAME .
+
+      - name: Push Docker image
+        run: |
+          docker push $IMAGE_NAME
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --image=$IMAGE_NAME \
+            --region=$REGION \
+            --platform=managed \
+            --allow-unauthenticated \
+            --min-instances=1 \
+            --max-instances=100 \
+            --service-account=deployer-sa@terraterri-454406.iam.gserviceaccount.com \
+            --project=$PROJECT_ID
