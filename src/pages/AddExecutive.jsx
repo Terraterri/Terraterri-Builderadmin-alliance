@@ -13,7 +13,7 @@ const AddExecutive = () => {
   const location = useLocation();
   const userData = useSelector(state => state.user.userData)
 
-  console.log(userData)
+  //console.log(userData)
 
   const { expoCode, stallCode, newStallId } = location.state || {};
 
