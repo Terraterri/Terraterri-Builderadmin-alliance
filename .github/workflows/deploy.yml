@@ -8,9 +8,9 @@ on:
 env:
   PROJECT_ID: terraterri-454406
   REGION: asia-south1
-  SERVICE_NAME: builder-admin-terraterri-com
-  REPOSITORY: builder-admin-terraterri-com
-  IMAGE_NAME: asia-south1-docker.pkg.dev/terraterri-454406/builder-admin-terraterri-com/builder-admin-terraterri-com:${{ github.sha }}
+  SERVICE_NAME: builder-alliance-terraterri
+  REPOSITORY: builder-alliance-terraterri
+  IMAGE_NAME: asia-south1-docker.pkg.dev/terraterri-454406/builder-alliance-terraterri/builder-alliance-terraterri:${{ github.sha }}
 
   VITE_USER_ENDPOINT: https://micro-api-one.terraterri.com
   VITE_SERVICES_ENDPOINT: https://micro-api-two.terraterri.com
@@ -18,7 +18,7 @@ env:
   VITE_WEBSITE_ENDPOINT: https://nodeapi.terraterri.com
   VITE_EXPOADMIN_ENDPOINT: https://expoadminapi.terraterri.com/
   VITE_EXPOAPI_ENDPOINT: https://expoadminapi.terraterri.com/tt-expo-builder-be/
-  VITE_BASE_URL: https://builder.admin.terraterri.com/
+  VITE_BASE_URL: https://builderalliance.terraterri.com/
 
 jobs:
   deploy:
@@ -71,5 +71,5 @@ jobs:
             --allow-unauthenticated \
             --min-instances=1 \
             --max-instances=100 \
-            --service-account=deployer-sa@terraterri-454406.iam.gserviceaccount.com \
+            --service-account=developer2propy@terraterri-454406.iam.gserviceaccount.com \
             --project=$PROJECT_ID
