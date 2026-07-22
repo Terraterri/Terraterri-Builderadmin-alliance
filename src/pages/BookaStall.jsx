@@ -8,13 +8,18 @@ import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import 'react-tabs/style/react-tabs.css';
 import moment from 'moment';
 import Loader from '../components/Loader';
-import { expoApiClient, expoAdminClient } from '../utils/httpClient'
+import { expoApiClient, expoAdminClient, masterClient } from '../utils/httpClient'
 import { useSelector } from 'react-redux';
 import { PiNutFill } from 'react-icons/pi';
 import { toastError } from '../utils/toast';
+import { environment } from '../utils/environment';
+
+
+
 const BookaStall = () => {
 
   const userData = useSelector((state) => state.user.userData);
+  console.log(userData)
 
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
@@ -59,29 +64,42 @@ const BookaStall = () => {
   }, []);
 
   const HandleIntiatePayment = async () => {
+    if (!selStallId) {
+      toastError('Please select a stall');
+      return;
+    }
+    setLoading(true);
     const data = new FormData();
-    data.append('amount', 100);
 
+    // data.append('amount', stallPrice || 100);
+
+    data.append('amount', 1);
     try {
-      const response = await expoApiClient.post('/stallBooking/initiatePayment.php', data);
+      // const response = await expoApiClient.post('/stallBooking/initiatePayment.php', data);
 
+      // const { id, amount } = response.data;
+
+      const response = await masterClient.post('/create-order', data, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      // console.log(response);
       const { id, amount } = response.data;
 
       const options = {
-        key: 'rzp_test_tm4DP29BcGGzff',
+        key: environment.razorpayApiKey,
         amount: amount,
         currency: 'INR',
-        name: 'Your Company Name',
-        description: 'Test Transaction',
+        name: 'Terraterri / AirPropx',
+        description: 'Stall Booking Payment',
         order_id: id,
-        handler: async function (response) {
-          alert('Payment successful!');
-          await verifyPayment(response);
+        handler: async function (res) {
+          await verifyPayment(res);
+          await BookStall();
         },
         prefill: {
-          name: 'Your Name',
-          email: 'srinivas.email@gmail.com',
-          contact: '9999999999'
+          name: userData?.name || userData?.builderName || '',
+          email: userData?.email || '',
+          contact: userData?.mobile || userData?.phone || ''
         },
         theme: {
           color: '#F37254'
@@ -92,23 +110,34 @@ const BookaStall = () => {
       rzp1.open();
     } catch (error) {
       console.error('Error creating order:', error);
+      toastError('Failed to initiate payment');
+    } finally {
+      setLoading(false);
     }
   };
 
   const verifyPayment = async (response) => {
     const verifyUrl = '/stallBooking/verifyPayment.php';
-    console.log(response)
+    console.log(response);
     try {
-      let response = await expoApiClient.post(verifyUrl, response);
+
+      response.expoId = selectedExpo?.newExpoId;
+      response.expoUnqCode = selectedExpo?.expoUnqCode;
+      response.stallUnqCode = selStallId;
+      response.stallType = selectedStall;
+      response.builderId = userData?.id;
+      response.amount = stallPrice;
+
+      await expoApiClient.post(verifyUrl, response);
     } catch (error) {
       console.error('Error verifying payment:', error);
-      alert('Payment verification failed!');
+      toastError('Payment verification failed!');
     }
   };
 
   const BookStall = async () => {
     setLoading(true)
-    if (!selStallId) { 
+    if (!selStallId) {
       toastError('Please select a stall');
       setLoading(false)
       return;
@@ -125,7 +154,7 @@ const BookaStall = () => {
 
       console.log('payload', payload);
       // return;
-      
+
 
       const res = await expoApiClient.post('/stallBooking/stallBooking.php', payload);
       await updateExpoStalls()
@@ -166,9 +195,9 @@ const BookaStall = () => {
         setShow(false);
         setExpos([]);
         setFilteredExpos([]);
-        setSelectedCountry([]);
-        setSelectedCity([]);
-        setSelectedType([]);
+        setSelectedCountry('');
+        setSelectedCity('');
+        setSelectedType('');
         setSelStallId('');
         setSelectedExpo(null);
       }
@@ -185,7 +214,7 @@ const BookaStall = () => {
   const completedExpo = async () => {
     setLoading(true);
     try {
-      const res = await expoAdminClient.get('/NewExpo/get.php?type=future',);
+      const res = await expoAdminClient.get('/NewExpo/get.php?type=ongoing',);
       if (res?.data?.status && res.data.data.length) {
         setExpos(res.data.data);
       }
@@ -248,7 +277,20 @@ const BookaStall = () => {
       if (filteredExpos.length > 0) {
         const expo = filteredExpos[0];
         setSelectedExpo(expo);
-        setExpoStallDetails(JSON.parse(expo.stalls));
+        let parsedStalls = {};
+        if (expo && expo.stalls) {
+          if (typeof expo.stalls === 'object') {
+            parsedStalls = expo.stalls;
+          } else if (typeof expo.stalls === 'string') {
+            try {
+              parsedStalls = JSON.parse(expo.stalls);
+            } catch (err) {
+              console.error("Error parsing expo stalls JSON:", err);
+              parsedStalls = {};
+            }
+          }
+        }
+        setExpoStallDetails(parsedStalls || {});
       } else {
         setSelectedExpo(null);
         setExpoStallDetails({});
@@ -343,11 +385,11 @@ const BookaStall = () => {
                         </option>
                         {[...new Set(expos
                           .filter((cExpo) => (!selectedCountry || cExpo.expoCountry === selectedCountry) && (!selectedCity || cExpo.expoCity === selectedCity))
-                          .map((cExpo) => cExpo.expoType))].map((expoType, index) => (
-                          <option key={index} value={expoType}>
-                            {expoType}
-                          </option>
-                        ))}
+                          .map((cExpo) => cExpo))].map((cExpo, index) => (
+                            <option key={index} value={cExpo.expoType}>
+                              {cExpo.expoType}
+                            </option>
+                          ))}
                       </select>
                     </div>
                   </div>
@@ -376,7 +418,7 @@ const BookaStall = () => {
                             <div className="pricing-item text-center">
                               <h2 className="gold">AIRPROPX - {selectedExpo.expoCity}</h2>
                               <h6>
-                                THE METAVERSE <span>{selectedType}</span> REALESTATE EXPO
+                                THE METAVERSE <span>{selectedExpo.name}</span> REALESTATE EXPO
                               </h6>
                               <h6 className="vald-ot">10 &amp; 11 - March-2024</h6>
                               <h3>₹ {stallPrice ? stallPrice : '-'} / 1 Expo </h3>
@@ -420,22 +462,22 @@ const BookaStall = () => {
                       <div className='col-md-6'>
                         <div className="row">
                           <div className="col-md-8">
-                        <h3>Expo Layout-Plan</h3>
+                            <h3>Expo Layout-Plan</h3>
                           </div>
                           <div className="col-md-4">
-                        {/* <h3>Select Month</h3> */}
-                        <select className="form-control">
-                          <option value="Select Month">Select Month</option>
-                          <option value="January">January</option>
-                          <option value="February">February</option>
-                          <option value="March">March</option>
-                          <option value="March">April</option>
-                          <option value="March">May</option>
-                          <option value="March">June</option>
-                          <option value="March">July</option>
-                          <option value="March">August</option>
-                          <option value="March">September</option>
-                        </select>
+                            {/* <h3>Select Month</h3> */}
+                            <select className="form-control">
+                              <option value="Select Month">Select Month</option>
+                              <option value="January">January</option>
+                              <option value="February">February</option>
+                              <option value="March">March</option>
+                              <option value="March">April</option>
+                              <option value="March">May</option>
+                              <option value="March">June</option>
+                              <option value="March">July</option>
+                              <option value="March">August</option>
+                              <option value="March">September</option>
+                            </select>
                           </div>
                         </div>
                       </div>
@@ -681,16 +723,10 @@ const BookaStall = () => {
                               </div>
                               <div className="col-md-12 text-right">
 
-                                {/* <button
-                                  className="grn"
-                                  fdprocessedid="jbxtud"
-                                  onClick={HandleIntiatePayment}>
-                                  Buy Now
-                                </button> */}
                                 <button
                                   className="grn"
                                   fdprocessedid="jbxtud"
-                                  onClick={BookStall}>
+                                  onClick={HandleIntiatePayment}>
                                   Buy Now
                                 </button>
                               </div>

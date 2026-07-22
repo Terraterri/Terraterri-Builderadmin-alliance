@@ -26,7 +26,7 @@ function App() {
   const dispatch = useDispatch();
   const token = localStorage.getItem('adminToken');
 
-  const acceptRoles = ['Builder', 'Exclusive Agent', 'Agent', 'Owner'];
+  const acceptRoles = ['Alliance Builder'];
 
   const ValidateToken = async () => {
     if (token == null) {
@@ -90,7 +90,7 @@ function App() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken'); 
+    const token = localStorage.getItem('adminToken');
 
     if (token != null) {
       ValidateToken();

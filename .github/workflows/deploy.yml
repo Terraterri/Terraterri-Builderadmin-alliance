@@ -19,6 +19,8 @@ env:
   VITE_EXPOADMIN_ENDPOINT: https://expoadminapi.terraterri.com/
   VITE_EXPOAPI_ENDPOINT: https://expoadminapi.terraterri.com/tt-expo-builder-be/
   VITE_BASE_URL: https://builderalliance.terraterri.com/
+  VITE_RAZOR_API_KEY: rzp_live_T7LAp9LGXMPPkR
+  VITE_RAYZOR_SECRET_KEY: 4UleDfYrt2hl2ttvQCNBYO9R
 
 jobs:
   deploy:
@@ -53,6 +55,8 @@ jobs:
           echo "VITE_EXPOADMIN_ENDPOINT=$VITE_EXPOADMIN_ENDPOINT" >> .env.production
           echo "VITE_EXPOAPI_ENDPOINT=$VITE_EXPOAPI_ENDPOINT" >> .env.production
           echo "VITE_BASE_URL=$VITE_BASE_URL" >> .env.production
+          echo "VITE_RAZOR_API_KEY=$VITE_RAZOR_API_KEY" >> .env.production
+          echo "VITE_RAYZOR_SECRET_KEY=$VITE_RAYZOR_SECRET_KEY" >> .env.production
 
       - name: Build Docker image
         run: |

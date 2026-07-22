@@ -53,22 +53,35 @@ const StallManagement = () => {
       setLoading(true);
       const response = await expoApiClient.get(`/createStall/getStallInfo.php?id=${id}`);
       const response2 = await expoApiClient.get(`/categories/getByStall.php?stallInfoId=${id}`);
-      if (response?.data?.status && response?.data?.status) {
-        if (response2?.data?.data.length > 0) {
-          setForm(() => ({
-            ...response.data.data[0],
-            ...response2?.data?.data?.[0]
-          }))
-        } else {
-          setForm(() => ({
-            ...response.data.data[0],
-            categories: [{
-              category: "",
-              city: "",
-              locality: []
-            }]
-          }))
+      if (response?.data?.status) {
+        let fetchedCategories = [{ category: "", city: "", locality: [] }];
+        const rawCats = Array.isArray(response2?.data?.data)
+          ? response2.data.data
+          : Array.isArray(response2?.data?.data?.categories)
+            ? response2.data.data.categories
+            : [];
+        if (rawCats.length > 0) {
+          fetchedCategories = rawCats.map(cat => {
+            let locs = cat.locality;
+            if (typeof locs === 'string') {
+              try {
+                locs = JSON.parse(locs);
+              } catch (e) {
+                locs = locs.split(',').map(s => s.trim()).filter(Boolean);
+              }
+            }
+            return {
+              category: cat.category || "",
+              city: cat.city || "",
+              locality: Array.isArray(locs) ? locs : []
+            };
+          });
         }
+        setForm((prev) => ({
+          ...prev,
+          ...(response.data.data[0] || {}),
+          categories: fetchedCategories
+        }));
       }
     } catch (error) {
       console.error(error);
@@ -268,22 +281,26 @@ const StallManagement = () => {
     });
 
     // validate categories
-    errors.categories = form.categories.map((cat) => {
+    const currentCats = commitPendingLocalities(form.categories);
+    setForm((prev) => ({ ...prev, categories: currentCats }));
+
+    errors.categories = currentCats.map((cat) => {
       let categoryErrors = {};
-      if (!cat.category) {
-        categoryErrors.category = "Category is required"
+      if (!cat.category || cat.category === "defalut" || cat.category === "default") {
+        categoryErrors.category = "Category is required";
         isValid = false;
       }
-      if (!cat.city) {
-        categoryErrors.city = "City is required"
+      if (!cat.city || !cat.city.trim()) {
+        categoryErrors.city = "City is required";
         isValid = false;
       }
-      if (!cat.locality.length > 0) {
-        categoryErrors.locality = "locality is required"
+      const locArray = Array.isArray(cat.locality) ? cat.locality : [];
+      if (locArray.length === 0) {
+        categoryErrors.locality = "locality is required";
         isValid = false;
       }
-      return categoryErrors
-    })
+      return categoryErrors;
+    });
 
     // Validate projects
     errors.projects = form.projects.map((project, index) => {
@@ -418,27 +435,78 @@ const StallManagement = () => {
     setInputLocalities(updated);
   };
 
+  const addLocalityChip = (categoryIndex) => {
+    const text = (inputLocalities[categoryIndex] || '').trim();
+    if (!text) return;
+
+    const currentLocs = form?.categories?.[categoryIndex]?.locality || [];
+    if (currentLocs.length >= 4) {
+      toastWarning("Localities Limit Reached");
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      categories: prev.categories.map((category, i) =>
+        i === categoryIndex
+          ? { ...category, locality: [...(category.locality || []), text] }
+          : category
+      )
+    }));
+
+    const updated = [...inputLocalities];
+    updated[categoryIndex] = '';
+    setInputLocalities(updated);
+  };
+
+  const commitPendingLocalities = (currentCategories) => {
+    let updatedInputs = [...inputLocalities];
+    const updatedCategories = currentCategories.map((cat, i) => {
+      const text = (updatedInputs[i] || '').trim();
+      if (text) {
+        const existing = Array.isArray(cat.locality) ? cat.locality : [];
+        if (existing.length < 4) {
+          updatedInputs[i] = '';
+          return {
+            ...cat,
+            locality: [...existing, text]
+          };
+        }
+      }
+      return cat;
+    });
+    setInputLocalities(updatedInputs);
+    return updatedCategories;
+  };
 
   const addCategory = () => {
-    const lastCategory = form.categories[form.categories.length - 1];
+    const currentCats = commitPendingLocalities(form.categories);
+    setForm((prevForm) => ({ ...prevForm, categories: currentCats }));
+
+    const lastCategory = currentCats[currentCats.length - 1];
 
     // Simple validation checks
     const isValid =
+      lastCategory &&
+      lastCategory.category &&
+      lastCategory.category !== "defalut" &&
+      lastCategory.category !== "default" &&
       lastCategory.category.trim() !== "" &&
+      lastCategory.city &&
       lastCategory.city.trim() !== "" &&
       Array.isArray(lastCategory.locality) &&
       lastCategory.locality.length > 0;
 
     if (!isValid) {
-      toastError("Please fill the previous category completely before adding a new one.");
+      toastError("Please fill the previous category completely (category, city, and at least one locality) before adding a new one.");
       return;
     }
 
-    if (form.categories.length < 4) {
+    if (currentCats.length < 4) {
       setForm((prevForm) => ({
         ...prevForm,
         categories: [
-          ...prevForm.categories,
+          ...currentCats,
           {
             category: "",
             city: "",
@@ -461,21 +529,10 @@ const StallManagement = () => {
   }
 
   const handleKeyDown = (e, index) => {
-    if (e.key === 'Enter' && e.target.value !== '') {
-      if (form?.categories?.[index]?.locality.length < 4) {
-        setForm((prev) => ({
-          ...prev,
-          categories: prev.categories.map((category, i) =>
-            i == index
-              ? { ...category, [e.target.name]: [...category.locality, { id: null, name: e.target.value }] }
-              : category
-          )
-        }));
-        const updated = [...inputLocalities];
-        updated[index] = '';
-        setInputLocalities(updated);
-      } else {
-        toastWarning("Localities Limit Reached")
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.target.value.trim() !== '') {
+        addLocalityChip(index);
       }
     }
   }
@@ -559,24 +616,37 @@ const StallManagement = () => {
                     </div>
                     <div className="col-md-3">
                       <h6 className="BuildNameCom mb-2">Locality :</h6>
-                      <input
-                        type='text'
-                        className="form-control"
-                        placeholder='locality'
-                        id='category'
-                        name="locality"
-                        value={inputLocalities[i] || ""}
-                        onChange={(e) => handleLocalityInputChange(e, i)}
-                        onKeyDown={(e) => handleKeyDown(e, i)}
-                      />
+                      <div className="d-flex gap-1 mb-1">
+                        <input
+                          type='text'
+                          className="form-control"
+                          placeholder='Type locality & press Enter'
+                          id='category'
+                          name="locality"
+                          value={inputLocalities[i] || ""}
+                          onChange={(e) => handleLocalityInputChange(e, i)}
+                          onKeyDown={(e) => handleKeyDown(e, i)}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => addLocalityChip(i)}
+                          title="Add Locality"
+                        >
+                          +
+                        </button>
+                      </div>
                       {formError.locality && <p className="err">{formError.locality}</p>}
                       {formError.categories?.[i]?.locality && <span className="text-danger">{formError?.categories?.[i].locality}</span>}
                     </div>
-                    <div className="col-md-2 d-flex asign_lists">
-                      {form?.categories?.[i]?.locality.map((loc, idx) =>
-                        <h6 key={idx}>{loc.name}
-                          <IoCloseSharp onClick={() => removeLocality(i, idx)} /> </h6>
-                      )}
+                    <div className="col-md-2 d-flex asign_lists flex-wrap">
+                      {Array.isArray(category?.locality) && category.locality.map((loc, idx) => {
+                        const locName = typeof loc === 'object' && loc !== null ? (loc.name || '') : loc;
+                        return (
+                          <h6 key={idx}>{locName}
+                            <IoCloseSharp onClick={() => removeLocality(i, idx)} style={{ cursor: 'pointer', marginLeft: '4px' }} /> </h6>
+                        );
+                      })}
                     </div>
                     {form?.categories.length - 1 === i &&
                       <div className="col-md-3 d-flex mt-3">

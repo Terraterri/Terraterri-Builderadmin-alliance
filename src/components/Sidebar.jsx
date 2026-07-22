@@ -26,7 +26,7 @@ const Sidebars = () => {
       url: '/dashboard',
       className: 'active',
     },
-  
+
     // {
     //   label: <span className='icons_ot'><MdOutlineWorkspacePremium />Builder Projects</span>,
     //   subMenu: [
@@ -91,7 +91,7 @@ const Sidebars = () => {
     //   roles: ['Builder', 'Exclusive Sales Partner'],
     // },
 
-    
+
     {
       label: <span className='icons_ot'> <SiMetasploit />PREMIUM PROPERTY LISTINGS</span>,
       subMenu: [
@@ -108,9 +108,9 @@ const Sidebars = () => {
           url: '/property/add'
         },
       ],
-       roles: ['Agent', 'Owner'],
+      roles: ['Agent', 'Owner'],
     },
-    
+
     {
       label: <span className='icons_ot'><SiExpo /> AIRPROPX</span>,
       subMenu: [
@@ -126,10 +126,10 @@ const Sidebars = () => {
         //   label: 'Future Expos',
         //   url: '/expo/future'
         // },
-        // {
-        //   label: 'On Going Expos',
-        //   url: '/expo/ongoing'
-        // },
+        {
+          label: 'On Going Expos',
+          url: '/expo/ongoing'
+        },
         {
           label: 'Completed Expos',
           url: '/expo/completed'
@@ -139,16 +139,16 @@ const Sidebars = () => {
     },
 
 
-      {
-  label: <span className='icons_ot'><LuLogIn /> Builder Box</span>,
-  url: "/model/dashboard",
-      excludeRoles: ['Owner'],
-  },
-    {
-  label: <span className='icons_ot'><LuLogIn /> CRM LOGIN</span>,
-  url: "/assignexe1",
-      excludeRoles: ['Owner'],
-  },
+    //     {
+    // label: <span className='icons_ot'><LuLogIn /> Builder Box</span>,
+    // url: "/model/dashboard",
+    //     excludeRoles: ['Owner'],
+    // },
+    // {
+    //   label: <span className='icons_ot'><LuLogIn /> CRM LOGIN</span>,
+    //   url: "/assignexe1",
+    //   excludeRoles: ['Owner'],
+    // },
 
 
     // {

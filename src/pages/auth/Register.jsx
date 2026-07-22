@@ -12,7 +12,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Carousel } from 'react-bootstrap';
 import Loader from '../../components/Loader';
 import { toastError, toastSuccess } from '../../utils/toast';
-import { authClient, masterClient, websiteClient } from '../../utils/httpClient';
+import { authClient, masterClient, websiteClient, expoAdminClient } from '../../utils/httpClient';
 import { Country, State, City } from 'country-state-city';
 import { BsWhatsapp } from "react-icons/bs";
 
@@ -34,7 +34,8 @@ const Register = () => {
   const [formError, setFormError] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // ─── Location Dropdowns ─────────────────────────────────────────────────────
+  // ─── Location Dropdowns & Expos ─────────────────────────────────────────────
+  const [expos, setExpos] = useState([]);
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
@@ -58,7 +59,44 @@ const Register = () => {
   // Lifecycle Hooks
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    setCountries(Country.getAllCountries());
+    const fetchExposAndLocations = async () => {
+      const allCountries = Country.getAllCountries();
+      try {
+        let expoList = [];
+        const res = await expoAdminClient.get('/NewExpo/get.php?type=ongoing');
+        if (res?.data?.status && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          expoList = res.data.data;
+        } else {
+          const resFallback = await expoAdminClient.get('/NewExpo/get.php');
+          if (resFallback?.data?.status && Array.isArray(resFallback.data.data)) {
+            expoList = resFallback.data.data;
+          }
+        }
+
+        setExpos(expoList);
+
+        if (expoList.length > 0) {
+          const filteredCountries = allCountries.filter((c) =>
+            expoList.some((e) => {
+              const countryVal = e.expoCountry || e.country || e.country_code;
+              return (
+                countryVal &&
+                (countryVal.toLowerCase() === c.isoCode.toLowerCase() ||
+                  countryVal.toLowerCase() === c.name.toLowerCase())
+              );
+            })
+          );
+          setCountries(filteredCountries.length > 0 ? filteredCountries : allCountries);
+        } else {
+          setCountries(allCountries);
+        }
+      } catch (err) {
+        console.error('Error fetching expos for registration locations:', err);
+        setCountries(allCountries);
+      }
+    };
+
+    fetchExposAndLocations();
   }, []);
 
   /**
@@ -88,6 +126,8 @@ const Register = () => {
   const api = {
     requestOtp: (data) => websiteClient.post('otp/request-otp', data),
     verifyOtp: (data) => websiteClient.post('otp/verify-otp', data),
+    registerRequestOtp: (data) => websiteClient.post('otp/register-request-otp', data),
+
     register: (data) => authClient.post('register', data),
   };
 
@@ -108,6 +148,98 @@ const Register = () => {
     }
   };
 
+  // ─── Location Matching Helpers ────────────────────────────────────────────────
+  const isCityMatch = (c, expoCityStr) => {
+    if (!c || !expoCityStr) return false;
+    const cName = c.name.toLowerCase();
+    const eCity = expoCityStr.toLowerCase().trim();
+
+    if (cName === eCity || cName.startsWith(eCity) || eCity.startsWith(cName)) return true;
+    if (eCity.length >= 3 && cName.startsWith(eCity.substring(0, 3))) return true;
+
+    const cityCodeMap = {
+      hyd: ['hyderabad'],
+      vja: ['vijayawada'],
+      viz: ['visakhapatnam', 'vizag'],
+      vzg: ['visakhapatnam', 'vizag'],
+      blr: ['bengaluru', 'bangalore'],
+      che: ['chennai'],
+      maa: ['chennai'],
+      bom: ['mumbai'],
+      mum: ['mumbai'],
+      del: ['delhi', 'new delhi'],
+      ccu: ['kolkata'],
+      kol: ['kolkata'],
+      pnq: ['pune'],
+      pun: ['pune'],
+      ahd: ['ahmedabad'],
+      amd: ['ahmedabad'],
+    };
+
+    if (cityCodeMap[eCity] && cityCodeMap[eCity].some((alias) => cName.includes(alias))) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const isExpoInState = (e, countryCode, s) => {
+    const countryVal = e.expoCountry || e.intCountry || e.country || e.country_code;
+    const selectedCountryObj = Country.getAllCountries().find((c) => c.isoCode === countryCode);
+    const matchCountry =
+      !countryCode ||
+      (countryVal &&
+        (countryVal.toLowerCase() === countryCode.toLowerCase() ||
+          (selectedCountryObj && countryVal.toLowerCase() === selectedCountryObj.name.toLowerCase())));
+
+    if (!matchCountry) return false;
+
+    const stateVal = e.expoState || e.state || e.state_code;
+    if (stateVal) {
+      return (
+        stateVal.toLowerCase() === s.isoCode.toLowerCase() ||
+        stateVal.toLowerCase() === s.name.toLowerCase()
+      );
+    }
+
+    const expoCityStr = e.expoCity || e.intCity || e.city || e.city_code;
+    if (expoCityStr) {
+      const citiesInState = City.getCitiesOfState(countryCode, s.isoCode);
+      return citiesInState.some((c) => isCityMatch(c, expoCityStr));
+    }
+
+    return true;
+  };
+
+  const isExpoInCity = (e, countryCode, stateCode, c) => {
+    const selectedCountryObj = Country.getAllCountries().find((co) => co.isoCode === countryCode);
+    const selectedStateObj = State.getStatesOfCountry(countryCode).find((st) => st.isoCode === stateCode);
+
+    const countryVal = e.expoCountry || e.intCountry || e.country || e.country_code;
+    const matchCountry =
+      !countryCode ||
+      (countryVal &&
+        (countryVal.toLowerCase() === countryCode.toLowerCase() ||
+          (selectedCountryObj && countryVal.toLowerCase() === selectedCountryObj.name.toLowerCase())));
+
+    if (!matchCountry) return false;
+
+    const stateVal = e.expoState || e.state || e.state_code;
+    if (stateVal) {
+      const matchState =
+        stateVal.toLowerCase() === stateCode.toLowerCase() ||
+        (selectedStateObj && stateVal.toLowerCase() === selectedStateObj.name.toLowerCase());
+      if (!matchState) return false;
+    }
+
+    const expoCityStr = e.expoCity || e.intCity || e.city || e.city_code;
+    if (expoCityStr) {
+      return isCityMatch(c, expoCityStr);
+    }
+
+    return true;
+  };
+
   const handleForm = (e) => {
     const { name, value, checked, type } = e.target;
     const val = type === 'checkbox' ? checked : value;
@@ -115,13 +247,24 @@ const Register = () => {
 
     if (name === 'country_code') {
       const st = State.getStatesOfCountry(value);
-      setStates(st);
+      let filteredStates = st;
+      if (expos.length > 0) {
+        filteredStates = st.filter((s) => expos.some((expo) => isExpoInState(expo, value, s)));
+      }
+
+      setStates(filteredStates.length > 0 ? filteredStates : st);
       setCities([]);
       setForm((prev) => ({ ...prev, state_code: '', city_code: '' }));
     }
+
     if (name === 'state_code') {
       const ct = City.getCitiesOfState(form.country_code, value);
-      setCities(ct);
+      let filteredCities = ct;
+      if (expos.length > 0) {
+        filteredCities = ct.filter((c) => expos.some((expo) => isExpoInCity(expo, form.country_code, value, c)));
+      }
+
+      setCities(filteredCities.length > 0 ? filteredCities : ct);
       setForm((prev) => ({ ...prev, city_code: '' }));
     }
   };
@@ -183,7 +326,7 @@ const Register = () => {
 
     try {
       setLoading(true);
-      const { data } = await api.requestOtp({ mobile: form.mobile });
+      const { data } = await api.registerRequestOtp({ mobile: form.mobile });
       if (data?.code === 200) {
         toastSuccess('OTP sent to your mobile number');
         setOtpSent(true);
@@ -289,19 +432,19 @@ const Register = () => {
   };
 
   const handleOtpPaste = (e) => {
-  e.preventDefault();
-  const paste = e.clipboardData.getData('text')
-    .slice(0, 6)
-    .replace(/\D/g, '')
-    .split('');
-    
-  if (paste.length === 6) {
-    const updated = [...otp];
-    paste.forEach((d, i) => (updated[i] = d));
-    setOtp(updated);
-    inputsRef.current[5]?.focus(); // Focus last input after paste
-  }
-};
+    e.preventDefault();
+    const paste = e.clipboardData.getData('text')
+      .slice(0, 6)
+      .replace(/\D/g, '')
+      .split('');
+
+    if (paste.length === 6) {
+      const updated = [...otp];
+      paste.forEach((d, i) => (updated[i] = d));
+      setOtp(updated);
+      inputsRef.current[5]?.focus(); // Focus last input after paste
+    }
+  };
 
 
   // ─── Submit Registration ────────────────────────────────────────────────────
@@ -312,7 +455,7 @@ const Register = () => {
       return;
     }
 
-    const roleId = registerAs.find((r) => r.name === formType)?.id;
+    const roleId = 12;
     const payload = { ...form, role_id: roleId };
 
     try {
@@ -359,7 +502,7 @@ const Register = () => {
 
           <div className="login-bg login-area pt-120 pb-120">
             <Link to="https://terraterri.com/">
-<h2>Builder Logo</h2>            </Link>
+              <h2>Builder Logo</h2>            </Link>
 
             <div className="container">
               <div className="row align-items-center">
@@ -487,8 +630,8 @@ const Register = () => {
                                     disabled={!form.state_code}
                                   >
                                     <option value="">City / Town</option>
-                                    {cities.map((c) => (
-                                      <option key={c.isoCode} value={c.isoCode}>
+                                    {cities.map((c, idx) => (
+                                      <option key={c.name || idx} value={c.name}>
                                         {c.name}
                                       </option>
                                     ))}

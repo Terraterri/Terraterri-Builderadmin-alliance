@@ -215,22 +215,26 @@ const AddExecutive = () => {
     });
 
     // validate categories
-    errors.categories = form.categories.map((cat) => {
+    const currentCats = commitPendingLocalities(form.categories);
+    setForm((prev) => ({ ...prev, categories: currentCats }));
+
+    errors.categories = currentCats.map((cat) => {
       let categoryErrors = {};
-      if (!cat.category) {
-        categoryErrors.category = "Category is required"
+      if (!cat.category || cat.category === "defalut" || cat.category === "default") {
+        categoryErrors.category = "Category is required";
         isValid = false;
       }
-      if (!cat.city) {
-        categoryErrors.city = "City is required"
+      if (!cat.city || !cat.city.trim()) {
+        categoryErrors.city = "City is required";
         isValid = false;
       }
-      if (!cat.locality.length > 0) {
-        categoryErrors.locality = "locality is required"
+      const locArray = Array.isArray(cat.locality) ? cat.locality : [];
+      if (locArray.length === 0) {
+        categoryErrors.locality = "locality is required";
         isValid = false;
       }
-      return categoryErrors
-    })
+      return categoryErrors;
+    });
 
     // Validate projects
     errors.projects = form.projects.map((project, index) => {
@@ -240,10 +244,10 @@ const AddExecutive = () => {
         projectErrors.project_title = "Project title is required";
         isValid = false;
       }
-      if (!project.brochure_url) {
-        projectErrors.brochure_url = "Brochure URL is required";
-        isValid = false;
-      }
+      // if (!project.brochure_url) {
+      //   projectErrors.brochure_url = "Brochure URL is required";
+      //   isValid = false;
+      // }
       return projectErrors;
     });
 
@@ -270,7 +274,7 @@ const AddExecutive = () => {
               {
                 category: "",
                 city: "",
-                locality: "",
+                locality: [],
               }
             ],
             builder: {},
@@ -383,27 +387,78 @@ const AddExecutive = () => {
     setInputLocalities(updated);
   };
 
+  const addLocalityChip = (categoryIndex) => {
+    const text = (inputLocalities[categoryIndex] || '').trim();
+    if (!text) return;
+
+    const currentLocs = form?.categories?.[categoryIndex]?.locality || [];
+    if (currentLocs.length >= 4) {
+      toastWarning("Localities Limit Reached");
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      categories: prev.categories.map((category, i) =>
+        i === categoryIndex
+          ? { ...category, locality: [...(category.locality || []), text] }
+          : category
+      )
+    }));
+
+    const updated = [...inputLocalities];
+    updated[categoryIndex] = '';
+    setInputLocalities(updated);
+  };
+
+  const commitPendingLocalities = (currentCategories) => {
+    let updatedInputs = [...inputLocalities];
+    const updatedCategories = currentCategories.map((cat, i) => {
+      const text = (updatedInputs[i] || '').trim();
+      if (text) {
+        const existing = Array.isArray(cat.locality) ? cat.locality : [];
+        if (existing.length < 4) {
+          updatedInputs[i] = '';
+          return {
+            ...cat,
+            locality: [...existing, text]
+          };
+        }
+      }
+      return cat;
+    });
+    setInputLocalities(updatedInputs);
+    return updatedCategories;
+  };
 
   const addCategory = () => {
-    const lastCategory = form.categories[form.categories.length - 1];
+    const currentCats = commitPendingLocalities(form.categories);
+    setForm((prevForm) => ({ ...prevForm, categories: currentCats }));
+
+    const lastCategory = currentCats[currentCats.length - 1];
 
     // Simple validation checks
     const isValid =
+      lastCategory &&
+      lastCategory.category &&
+      lastCategory.category !== "defalut" &&
+      lastCategory.category !== "default" &&
       lastCategory.category.trim() !== "" &&
+      lastCategory.city &&
       lastCategory.city.trim() !== "" &&
       Array.isArray(lastCategory.locality) &&
       lastCategory.locality.length > 0;
 
     if (!isValid) {
-      toastError("Please fill the previous category completely before adding a new one.");
+      toastError("Please fill the previous category completely (category, city, and at least one locality) before adding a new one.");
       return;
     }
 
-    if (form.categories.length < 4) {
+    if (currentCats.length < 4) {
       setForm((prevForm) => ({
         ...prevForm,
         categories: [
-          ...prevForm.categories,
+          ...currentCats,
           {
             category: "",
             city: "",
@@ -426,21 +481,10 @@ const AddExecutive = () => {
   }
 
   const handleKeyDown = (e, index) => {
-    if (e.key === 'Enter' && e.target.value !== '') {
-      if (form?.categories?.[index]?.locality.length < 4) {
-        setForm((prev) => ({
-          ...prev,
-          categories: prev.categories.map((category, i) =>
-            i == index
-              ? { ...category, [e.target.name]: [...category.locality, e.target.value] }
-              : category
-          )
-        }));
-        const updated = [...inputLocalities];
-        updated[index] = '';
-        setInputLocalities(updated);
-      } else {
-        toastWarning("Localities Limit Reached")
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.target.value.trim() !== '') {
+        addLocalityChip(index);
       }
     }
   }
@@ -490,11 +534,11 @@ const AddExecutive = () => {
                   </div>
                 </div>
                 {form?.categories.map((category, i) =>
-                  <div className="row mb-3 d-flex align-items-end">
+                  <div className="row mb-3 d-flex align-items-end" key={i}>
                     <div className="col-md-3">
                       <h6 className="BuildNameCom mb-2">Category  {i + 1}:</h6>
                       <select
-                        class="form-select"
+                        className="form-select"
                         aria-label="Default select example"
                         id='category'
                         name="category"
@@ -514,7 +558,7 @@ const AddExecutive = () => {
                       <h6 className="BuildNameCom mb-2">City :</h6>
                       <input
                         type='text'
-                        class="form-control"
+                        className="form-control"
                         placeholder='city'
                         id='category'
                         name="city"
@@ -525,24 +569,37 @@ const AddExecutive = () => {
                     </div>
                     <div className="col-md-3">
                       <h6 className="BuildNameCom mb-2">Locality :</h6>
-                      <input
-                        type='text'
-                        class="form-control"
-                        placeholder='locality'
-                        id='category'
-                        name="locality"
-                        value={inputLocalities[i] || ""}
-                        onChange={(e) => handleLocalityInputChange(e, i)}
-                        onKeyDown={(e) => handleKeyDown(e, i)}
-                      />
+                      <div className="d-flex gap-1 mb-1">
+                        <input
+                          type='text'
+                          className="form-control"
+                          placeholder='Type locality & press Enter'
+                          id='category'
+                          name="locality"
+                          value={inputLocalities[i] || ""}
+                          onChange={(e) => handleLocalityInputChange(e, i)}
+                          onKeyDown={(e) => handleKeyDown(e, i)}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => addLocalityChip(i)}
+                          title="Add Locality"
+                        >
+                          +
+                        </button>
+                      </div>
                       {formError.locality && <p className="err">{formError.locality}</p>}
                       {formError.categories?.[i]?.locality && <span className="text-danger">{formError?.categories?.[i].locality}</span>}
-                      <div className="d-flex asign_lists">
-                        {form?.categories?.[i]?.locality.map((loc, idx) =>
-                          <h6 key={idx}>{loc}
-                            <IoCloseSharp onClick={() => removeLocality(i, idx)} /> </h6>
-                        )}
-                      </div>
+                    </div>
+                    <div className="col-md-2 d-flex asign_lists flex-wrap">
+                      {Array.isArray(category?.locality) && category.locality.map((loc, idx) => {
+                        const locName = typeof loc === 'object' && loc !== null ? (loc.name || '') : loc;
+                        return (
+                          <h6 key={idx}>{locName}
+                            <IoCloseSharp onClick={() => removeLocality(i, idx)} style={{ cursor: 'pointer', marginLeft: '4px' }} /> </h6>
+                        );
+                      })}
                     </div>
                     <div className="col-md-2 d-flex">
                       <button onClick={addCategory} className='btn btn-primary'>Add</button>
