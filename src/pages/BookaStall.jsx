@@ -11,15 +11,18 @@ import Loader from '../components/Loader';
 import { expoApiClient, expoAdminClient, masterClient } from '../utils/httpClient'
 import { useSelector } from 'react-redux';
 import { PiNutFill } from 'react-icons/pi';
-import { toastError } from '../utils/toast';
+import { toastError, toastSuccess } from '../utils/toast';
+import { useNavigate } from 'react-router-dom';
 import { environment } from '../utils/environment';
 
 
 
 const BookaStall = () => {
 
+  const navigate = useNavigate();
+
   const userData = useSelector((state) => state.user.userData);
-  console.log(userData)
+  // console.log(userData)
 
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
@@ -94,7 +97,7 @@ const BookaStall = () => {
         order_id: id,
         handler: async function (res) {
           await verifyPayment(res);
-          await BookStall();
+          // await BookStall();
         },
         prefill: {
           name: userData?.name || userData?.builderName || '',
@@ -129,6 +132,13 @@ const BookaStall = () => {
       response.amount = stallPrice;
 
       await expoApiClient.post(verifyUrl, response);
+      await updateExpoStalls();
+      toastSuccess('Stall created successfully!');
+
+      setTimeout(() => {
+        navigate('/expo/pending');
+      }, 2000);
+
     } catch (error) {
       console.error('Error verifying payment:', error);
       toastError('Payment verification failed!');
@@ -254,6 +264,8 @@ const BookaStall = () => {
     const applyFilters = () => {
       let filteredExposData = expos;
 
+      console.log('I am coming to here')
+
       if (selectedCountry) {
         filteredExposData = filteredExposData.filter((expo) => expo.expoCountry === selectedCountry);
       }
@@ -274,7 +286,10 @@ const BookaStall = () => {
 
   useEffect(() => {
     if (selectedType && selectedCity) {
+      console.log('I am coming to here 2')
       if (filteredExpos.length > 0) {
+
+        console.log(filteredExpos)
         const expo = filteredExpos[0];
         setSelectedExpo(expo);
         let parsedStalls = {};
@@ -290,6 +305,8 @@ const BookaStall = () => {
             }
           }
         }
+
+        console.log(parsedStalls)
         setExpoStallDetails(parsedStalls || {});
       } else {
         setSelectedExpo(null);

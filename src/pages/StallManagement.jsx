@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router';
 import { ModalBody } from 'react-bootstrap';
 import Carousel from 'react-bootstrap/Carousel';
 import { IoCloseSharp } from "react-icons/io5";
+import confirmAction from '../components/reusable/ConfirmToast';
 const StallManagement = () => {
   const [inputLocalities, setInputLocalities] = useState([]);
   const userData = useSelector(state => state.user.userData);
@@ -53,13 +54,36 @@ const StallManagement = () => {
       setLoading(true);
       const response = await expoApiClient.get(`/createStall/getStallInfo.php?id=${id}`);
       const response2 = await expoApiClient.get(`/categories/getByStall.php?stallInfoId=${id}`);
-      if (response?.data?.status) {
-        let fetchedCategories = [{ category: "", city: "", locality: [] }];
-        const rawCats = Array.isArray(response2?.data?.data)
-          ? response2.data.data
-          : Array.isArray(response2?.data?.data?.categories)
-            ? response2.data.data.categories
-            : [];
+
+      let fetchedCategories = [{ category: "", city: "", locality: [] }];
+      let extraStallData = {};
+
+      if (response2?.data?.status) {
+        const resData = response2?.data?.data;
+        let rawCats = [];
+
+        if (Array.isArray(resData)) {
+          if (resData.length > 0 && Array.isArray(resData[0]?.categories)) {
+            rawCats = resData.flatMap(item => item.categories || []);
+            if (resData[0]?.stallCode || resData[0]?.expoUnqCode) {
+              extraStallData = {
+                ...(resData[0]?.stallCode ? { stallCode: resData[0].stallCode } : {}),
+                ...(resData[0]?.expoUnqCode ? { expoUnqCode: resData[0].expoUnqCode } : {})
+              };
+            }
+          } else if (resData.length > 0 && (resData[0]?.category !== undefined || resData[0]?.categoryId !== undefined)) {
+            rawCats = resData;
+          }
+        } else if (resData && typeof resData === 'object' && Array.isArray(resData.categories)) {
+          rawCats = resData.categories;
+          if (resData.stallCode || resData.expoUnqCode) {
+            extraStallData = {
+              ...(resData.stallCode ? { stallCode: resData.stallCode } : {}),
+              ...(resData.expoUnqCode ? { expoUnqCode: resData.expoUnqCode } : {})
+            };
+          }
+        }
+
         if (rawCats.length > 0) {
           fetchedCategories = rawCats.map(cat => {
             let locs = cat.locality;
@@ -70,16 +94,31 @@ const StallManagement = () => {
                 locs = locs.split(',').map(s => s.trim()).filter(Boolean);
               }
             }
+            const normalizedLocs = (Array.isArray(locs) ? locs : []).map(l => {
+              if (typeof l === 'object' && l !== null) {
+                return {
+                  ...(l.id ? { id: l.id } : l.localityId ? { id: l.localityId } : {}),
+                  name: l.name || l.locality || ''
+                };
+              }
+              return { name: l };
+            });
             return {
+              ...(cat.categoryId ? { categoryId: cat.categoryId } : {}),
+              ...(cat.id ? { id: cat.id } : {}),
               category: cat.category || "",
               city: cat.city || "",
-              locality: Array.isArray(locs) ? locs : []
+              locality: normalizedLocs
             };
           });
         }
+      }
+
+      if (response?.data?.status) {
         setForm((prev) => ({
           ...prev,
           ...(response.data.data[0] || {}),
+          ...extraStallData,
           categories: fetchedCategories
         }));
       }
@@ -247,26 +286,26 @@ const StallManagement = () => {
     }
   };
 
-  const validate = () => {
+  const validate = (formToValidate = form) => {
     let isValid = true;
     const errors = {};
 
     // Validate builder details
-    if (!form.Builder.name) {
+    if (!formToValidate.Builder?.name) {
       errors.builderName = "Builder Name is required";
       isValid = false;
     }
-    if (!form.Builder.phone) {
+    if (!formToValidate.Builder?.phone) {
       errors.builderPhone = "Builder Phone is required";
       isValid = false;
     }
 
     // Validate manager details
-    if (!form.Manager.name) {
+    if (!formToValidate.Manager?.name) {
       errors.managerName = "Manager Name is required";
       isValid = false;
     }
-    if (!form.Manager.phone) {
+    if (!formToValidate.Manager?.phone) {
       errors.managerPhone = "Manager Phone is required";
       isValid = false;
     }
@@ -274,17 +313,14 @@ const StallManagement = () => {
     // Validate banners and videos
     const requiredFields = ["StallInteriorVideo1", "StallInteriorVideo2", "bannerOne", "bannerTwo", "bannerThree", "bannerFour", "bannerFive", "bannerSix", "logoVideo", "logo", "builderName", "posterOne", "posterTwo", "exteriorVideo1", "exteriorVideo2"];
     requiredFields.forEach((field) => {
-      if (!form[field]) {
+      if (!formToValidate[field]) {
         errors[field] = `${field.replace(/([A-Z])/g, " $1")} is required`;
         isValid = false;
       }
     });
 
     // validate categories
-    const currentCats = commitPendingLocalities(form.categories);
-    setForm((prev) => ({ ...prev, categories: currentCats }));
-
-    errors.categories = currentCats.map((cat) => {
+    errors.categories = (formToValidate.categories || []).map((cat) => {
       let categoryErrors = {};
       if (!cat.category || cat.category === "defalut" || cat.category === "default") {
         categoryErrors.category = "Category is required";
@@ -303,7 +339,7 @@ const StallManagement = () => {
     });
 
     // Validate projects
-    errors.projects = form.projects.map((project, index) => {
+    errors.projects = (formToValidate.projects || []).map((project, index) => {
       let projectErrors = {};
 
       if (!project.project_title) {
@@ -323,17 +359,21 @@ const StallManagement = () => {
   }
 
   const handleSubmit = async (e) => {
-    if (validate()) {
+    e.preventDefault();
+    const currentCats = commitPendingLocalities(form.categories);
+    const updatedForm = { ...form, categories: currentCats };
+    setForm(updatedForm);
+
+    if (validate(updatedForm)) {
       const payload = {
-        ...form,
+        ...updatedForm,
         builderNameText: userData?.company_name
       }
       setLoading(true);
-      e.preventDefault();
       try {
         const response = await expoApiClient.post('/createStall/updateStall.php', payload);
         if (response?.data?.status) {
-          updateCategories();
+          updateCategories(currentCats);
         } else {
           toastError('Failed to update')
         }
@@ -347,10 +387,24 @@ const StallManagement = () => {
     }
   }
 
-  const updateCategories = async () => {
+  const updateCategories = async (categoriesToSave = form.categories) => {
     setLoading(true);
+
+    const formattedCategories = categoriesToSave.map(cat => ({
+      ...cat,
+      locality: (Array.isArray(cat.locality) ? cat.locality : []).map(loc => {
+        if (typeof loc === 'object' && loc !== null) {
+          return {
+            ...(loc.id ? { id: loc.id } : loc.localityId ? { id: loc.localityId } : {}),
+            name: loc.name || loc.locality || ''
+          };
+        }
+        return { name: loc };
+      }).filter(item => item.name && item.name.trim() !== '')
+    }));
+
     const payload = {
-      categories: form.categories,
+      categories: formattedCategories,
       expoUnqCode: form.expoUnqCode,
       stallInfoId: id,
       stallCode: form.stallCode,
@@ -360,7 +414,7 @@ const StallManagement = () => {
       const response = await expoApiClient.post('/categories/update.php', payload);
       if (response?.data?.status) {
         toastSuccess('Stall Updated Successfully');
-        navigate('/expo/future');
+        navigate('/expo/ongoing');
       } else {
         toastError('Failed to update')
       }
@@ -386,6 +440,8 @@ const StallManagement = () => {
   }
 
   const removeProject = async (project_id, index) => {
+    const isConfirmed = await confirmAction('Are you sure you want to delete this project');
+    if (!isConfirmed) return;
     setLoading(true);
     try {
       const res = await expoApiClient.get(`createStall/deleteProject.php?project_id=${project_id}`)
@@ -408,6 +464,8 @@ const StallManagement = () => {
   }
 
   const deleteBrochure = async (project_id, index) => {
+    const isConfirmed = await confirmAction('Are you sure you want to delete this brochure');
+    if (!isConfirmed) return;
     setLoading(true);
     try {
       const res = await expoApiClient.get(`createStall/deleteBrochure.php?project_id=${project_id}`)
@@ -521,12 +579,32 @@ const StallManagement = () => {
   };
 
 
-  const removeCategory = (index) => {
+  const removeCategory = async (index) => {
+    const isConfirmed = await confirmAction('Are you sure you want to remove this category');
+    if (!isConfirmed) return;
+
+    const targetCat = form?.categories?.[index];
+    const catId = targetCat?.categoryId || targetCat?.id;
+
+    if (catId) {
+      try {
+        setLoading(true);
+        await expoApiClient.get(`/categories/delete.php?categoryId=${catId}`)
+          .catch(() => expoApiClient.get(`/categories/deleteCategory.php?categoryId=${catId}`))
+          .catch(() => expoApiClient.get(`/categories/delete.php?id=${catId}`))
+          .catch(() => null);
+      } catch (err) {
+        console.error("Error deleting category:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
     setForm((prevForm) => ({
       ...prevForm,
       categories: prevForm.categories.filter((_, i) => i !== index)
     }));
-  }
+  };
 
   const handleKeyDown = (e, index) => {
     if (e.key === 'Enter') {
@@ -537,7 +615,23 @@ const StallManagement = () => {
     }
   }
 
-  const removeLocality = (categoryIndex, locIndex) => {
+  const removeLocality = async (categoryIndex, locIndex) => {
+    const targetLoc = form?.categories?.[categoryIndex]?.locality?.[locIndex];
+    const locId = typeof targetLoc === 'object' && targetLoc !== null ? (targetLoc.id || targetLoc.localityId) : null;
+
+    if (locId) {
+      try {
+        setLoading(true);
+        await expoApiClient.get(`/categories/deleteCategory.php?categoryId=${locId}`)
+          .catch(() => expoApiClient.get(`/categories/deleteLocality.php?id=${locId}`))
+          .catch(() => null);
+      } catch (err) {
+        console.error("Error deleting locality:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
     setForm((prevForm) => ({
       ...prevForm,
       categories: prevForm.categories.map((category, i) =>
@@ -620,12 +714,13 @@ const StallManagement = () => {
                         <input
                           type='text'
                           className="form-control"
-                          placeholder='Type locality & press Enter'
+                          placeholder='Type locality & press Enter or +'
                           id='category'
                           name="locality"
                           value={inputLocalities[i] || ""}
                           onChange={(e) => handleLocalityInputChange(e, i)}
                           onKeyDown={(e) => handleKeyDown(e, i)}
+                          onBlur={() => addLocalityChip(i)}
                         />
                         <button
                           type="button"
@@ -648,14 +743,14 @@ const StallManagement = () => {
                         );
                       })}
                     </div>
-                    {form?.categories.length - 1 === i &&
-                      <div className="col-md-3 d-flex mt-3">
-                        <button onClick={addCategory} className='btn btn-primary'>Add</button>
-                        {form?.categories?.length > 1 &&
-                          <button onClick={() => removeCategory(i)} className='btn btn-warning'>remove</button>
-                        }
-                      </div>
-                    }
+                    <div className="col-md-3 d-flex mt-3 gap-2">
+                      {form?.categories?.length - 1 === i && (
+                        <button type="button" onClick={addCategory} className='btn btn-primary'>Add</button>
+                      )}
+                      {form?.categories?.length > 1 && (
+                        <button type="button" onClick={() => removeCategory(i)} className='btn btn-warning'>remove</button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

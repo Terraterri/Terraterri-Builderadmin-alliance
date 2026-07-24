@@ -8,6 +8,9 @@ import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { IoCloseSharp } from "react-icons/io5";
 import { useSelector } from 'react-redux';
+import Modal from 'react-bootstrap/Modal';
+import { ModalBody } from 'react-bootstrap';
+import Carousel from 'react-bootstrap/Carousel';
 const AddExecutive = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,7 +45,10 @@ const AddExecutive = () => {
 
 
   const [loading, setLoading] = useState(false);
+  const [show, setShow] = useState(false);
+  const [brochureImages, setBrochureImages] = useState([]);
   const [form, setForm] = useState({
+    builderId: userData?.id,
     builderNameText: userData?.company_name,
     expoUnqCode: expoCode,
     stallUnqCode: stallCode,
@@ -144,6 +150,26 @@ const AddExecutive = () => {
       toastError(resFromMiddleware.data);
     }
   }
+
+  const openBrochure = (brochureImgs) => {
+    const imgs = Array.isArray(brochureImgs) ? brochureImgs : brochureImgs ? [brochureImgs] : [];
+    setBrochureImages(imgs);
+    setShow(true);
+  };
+
+  const removeBrochure = (index) => {
+    setForm((prevForm) => {
+      const updatedProjects = [...prevForm.projects];
+      updatedProjects[index] = {
+        ...updatedProjects[index],
+        brochure_url: ""
+      };
+      return {
+        ...prevForm,
+        projects: updatedProjects,
+      };
+    });
+  };
 
   const handleImage = async (e, index) => {
     setLoading(true);
@@ -262,8 +288,8 @@ const AddExecutive = () => {
       setLoading(true);
       try {
         res = await expoApiClient.post('createStall/create.php', form);
-        if (res?.status) {
-          await handleCategoriesSubmit(res?.stallId)
+        if (res?.data?.status) {
+          await handleCategoriesSubmit(res?.data?.stallId)
           toastSuccess('Stall Was Created')
           setForm({
             builderNameText: userData?.company_name,
@@ -1066,15 +1092,28 @@ const AddExecutive = () => {
 
                     <div className="col-md-6 mt-3 mb-3">
                       <h6 className="BuildNameCom mb-2">Get Brochure :</h6>
-                      {!project.brochure_url ? (
+                      {(!project.brochure_url || (Array.isArray(project.brochure_url) && project.brochure_url.length === 0)) ? (
                         <>
                           <input type="file" id='project' className="form-control" name="brochure_url" onChange={(e) => handleBrochure(e, i)} />
                           {formError.projects?.[i]?.brochure_url && <span className="text-danger">{formError.projects[i].brochure_url}</span>}
                         </>
                       ) : (
-                        <span className="upld_img">
-                          <button href={project.brochure_url} target="_blank"> </button>
-                        </span>
+                        <div className="d-flex align-items-center gap-2 mt-1">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => openBrochure(project.brochure_url)}
+                          >
+                            View Brochure
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => removeBrochure(i)}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1086,6 +1125,23 @@ const AddExecutive = () => {
                   Submit
                 </button>
               </div>
+
+              <Modal show={show} onHide={() => setShow(false)} className="stall_popup">
+                <Modal.Header closeButton>
+                  <div className='row w-100'>
+                    <h3>Project Brochure</h3>
+                  </div>
+                </Modal.Header>
+                <ModalBody>
+                  <Carousel>
+                    {brochureImages && brochureImages.map((brochureImg, idx) => (
+                      <Carousel.Item key={idx}>
+                        <img src={brochureImg} alt={`Brochure Page ${idx + 1}`} style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
+                      </Carousel.Item>
+                    ))}
+                  </Carousel>
+                </ModalBody>
+              </Modal>
             </div>
           </div>
         </div>
