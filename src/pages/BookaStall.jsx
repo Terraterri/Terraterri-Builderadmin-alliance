@@ -32,6 +32,12 @@ const BookaStall = () => {
   const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedType, setSelectedType] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(moment().format('MMMM'));
+
+  const monthsList = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   const [showSlots, setShowSlots] = useState(false);
 
@@ -123,13 +129,19 @@ const BookaStall = () => {
     const verifyUrl = '/stallBooking/verifyPayment.php';
     console.log(response);
     try {
+      const bookingStartDate = selectedMonth ? moment(selectedMonth, 'MMMM').startOf('month').format('YYYY-MM-DD') : '';
+      const bookingEndDate = selectedMonth ? moment(selectedMonth, 'MMMM').endOf('month').format('YYYY-MM-DD') : '';
 
-      response.expoId = selectedExpo?.newExpoId;
+      response.expoId = selectedExpo?.newExpoId || selectedExpo?.expo_id || selectedExpo?.expoId || selectedExpo?.id;
       response.expoUnqCode = selectedExpo?.expoUnqCode;
       response.stallUnqCode = selStallId;
       response.stallType = selectedStall;
       response.builderId = userData?.id;
       response.amount = stallPrice;
+      response.bookingStartDate = bookingStartDate;
+      response.bookingEndDate = bookingEndDate;
+      response.startDate = bookingStartDate;
+      response.endDate = bookingEndDate;
 
       await expoApiClient.post(verifyUrl, response);
       await updateExpoStalls();
@@ -181,15 +193,21 @@ const BookaStall = () => {
   const updateExpoStalls = async () => {
     setLoading(true);
     try {
+      const bookingStartDate = moment(selectedMonth, 'MMMM').startOf('month').format('YYYY-MM-DD');
+      const bookingEndDate = moment(selectedMonth, 'MMMM').endOf('month').format('YYYY-MM-DD');
+
       // Compute the updated state before updating the actual state
       const updatedState = { ...expoStallsDetails, [selStallId]: true };
 
       // Convert updated state to JSON
       let stalls = JSON.stringify(updatedState);
 
-      // Prepare payload
+      // Prepare payload with month and dates
       const payload = {
-        stalls: stalls
+        stalls: stalls,
+        month: selectedMonth,
+        bookingStartDate: bookingStartDate,
+        bookingEndDate: bookingEndDate
       };
 
       // Update state AFTER computing payload
@@ -197,7 +215,7 @@ const BookaStall = () => {
 
       // Hit the API with the correct payload
       const res = await expoAdminClient.post(
-        `/stalls/updateStalls.php?expoId=${selectedExpo.newExpoId}`,
+        `/stalls/updateStalls.php?expoId=${selectedExpo.newExpoId}&month=${selectedMonth}&bookingStartDate=${bookingStartDate}&bookingEndDate=${bookingEndDate}`,
         payload
       );
 
@@ -264,8 +282,6 @@ const BookaStall = () => {
     const applyFilters = () => {
       let filteredExposData = expos;
 
-      console.log('I am coming to here')
-
       if (selectedCountry) {
         filteredExposData = filteredExposData.filter((expo) => expo.expoCountry === selectedCountry);
       }
@@ -284,30 +300,101 @@ const BookaStall = () => {
     applyFilters();
   }, [selectedCountry, selectedCity, selectedType, expos]);
 
-  useEffect(() => {
-    if (selectedType && selectedCity) {
-      console.log('I am coming to here 2')
-      if (filteredExpos.length > 0) {
+  const fetchBookedStalls = async (expoId, month) => {
+    if (!expoId || !month) {
+      setExpoStallDetails({});
+      return;
+    }
+    setLoading(true);
+    try {
+      const bookingStartDate = moment(month, 'MMMM').startOf('month').format('YYYY-MM-DD');
+      const bookingEndDate = moment(month, 'MMMM').endOf('month').format('YYYY-MM-DD');
 
-        console.log(filteredExpos)
-        const expo = filteredExpos[0];
-        setSelectedExpo(expo);
-        let parsedStalls = {};
-        if (expo && expo.stalls) {
-          if (typeof expo.stalls === 'object') {
-            parsedStalls = expo.stalls;
-          } else if (typeof expo.stalls === 'string') {
-            try {
-              parsedStalls = JSON.parse(expo.stalls);
-            } catch (err) {
-              console.error("Error parsing expo stalls JSON:", err);
-              parsedStalls = {};
+      let res;
+      try {
+        res = await expoAdminClient.get(
+          `/stalls/getStalls.php?expoId=${expoId}&bookingStartDate=${bookingStartDate}&bookingEndDate=${bookingEndDate}`
+        );
+      } catch (e1) {
+        res = await expoApiClient.get(
+          `/stallBooking/getBookedStalls.php?expoId=${expoId}&bookingStartDate=${bookingStartDate}&bookingEndDate=${bookingEndDate}`
+        );
+      }
+
+      let parsedStalls = {};
+      const rawData = res?.data;
+
+      let stallList = [];
+      if (rawData) {
+        if (Array.isArray(rawData)) {
+          stallList = rawData;
+        } else if (Array.isArray(rawData.data)) {
+          stallList = rawData.data;
+        } else if (typeof rawData.data === 'string') {
+          try {
+            const parsed = JSON.parse(rawData.data);
+            if (Array.isArray(parsed)) stallList = parsed;
+          } catch (e) { }
+        } else if (typeof rawData === 'string') {
+          try {
+            const parsed = JSON.parse(rawData);
+            if (Array.isArray(parsed)) {
+              stallList = parsed;
+            } else if (Array.isArray(parsed.data)) {
+              stallList = parsed.data;
+            }
+          } catch (e) { }
+        } else if (typeof rawData.data === 'object' && rawData.data !== null) {
+          Object.keys(rawData.data).forEach((key) => {
+            if (rawData.data[key]) {
+              const codeStr = String(key).trim();
+              parsedStalls[codeStr] = true;
+              parsedStalls[codeStr.toUpperCase()] = true;
+            }
+          });
+        }
+      }
+
+      if (stallList.length > 0) {
+        stallList.forEach((item) => {
+          if (!item) return;
+
+          if (typeof item === 'string') {
+            const codeStr = item.trim();
+            if (codeStr) {
+              parsedStalls[codeStr] = true;
+              parsedStalls[codeStr.toUpperCase()] = true;
+            }
+            return;
+          }
+
+          const isBooked = item.status === undefined || item.status === null || item.status == 1 || item.status === true || item.status === '1' || item.status === 'booked' || item.status === 'active';
+
+          if (isBooked) {
+            const stallCode = item.stallUnqCode || item.stallNumber || item.stall_code || item.stallId;
+            if (stallCode) {
+              const codeStr = String(stallCode).trim();
+              parsedStalls[codeStr] = true;
+              parsedStalls[codeStr.toUpperCase()] = true;
             }
           }
-        }
+        });
+      }
 
-        console.log(parsedStalls)
-        setExpoStallDetails(parsedStalls || {});
+      setExpoStallDetails(parsedStalls);
+    } catch (err) {
+      console.error("Error fetching booked stalls for month:", err);
+      setExpoStallDetails({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedType && selectedCity) {
+      if (filteredExpos.length > 0) {
+        const expo = filteredExpos[0];
+        setSelectedExpo(expo);
       } else {
         setSelectedExpo(null);
         setExpoStallDetails({});
@@ -317,6 +404,15 @@ const BookaStall = () => {
       setExpoStallDetails({});
     }
   }, [selectedType, selectedCity, filteredExpos]);
+
+  useEffect(() => {
+    const expoId = selectedExpo?.newExpoId || selectedExpo?.expo_id || selectedExpo?.expoId || selectedExpo?.id;
+    if (expoId && selectedMonth) {
+      fetchBookedStalls(expoId, selectedMonth);
+    } else {
+      setExpoStallDetails({});
+    }
+  }, [selectedExpo, selectedMonth, show]);
 
 
   useEffect(() => {
@@ -339,9 +435,14 @@ const BookaStall = () => {
 
   // Select a stall, ensuring only one is selected at a time
   const onSelectStall = (stallId, stall) => {
-    if (expoStallsDetails[stallId]) return; // If already booked, do nothing
+    if (!selectedMonth) {
+      toastError('Please select a month first');
+      return;
+    }
+    const stallKeyUpper = stallId ? String(stallId).trim().toUpperCase() : '';
+    if (expoStallsDetails[stallId] || expoStallsDetails[stallKeyUpper]) return; // If already booked, do nothing
     selectTab(stall)
-    setSelStallId(stallId === selectedStall ? null : stallId);
+    setSelStallId(stallId === selStallId ? null : stallId);
   };
 
 
@@ -358,11 +459,11 @@ const BookaStall = () => {
                   <p>Showcase Your Projects at the Premier Metaverse Realestate Expo</p>
                 </div>
                 <div className="row slet_out">
-                  <div className="col-md-3 stateBox">
+                  <div className="col-md-4 stateBox">
                     <div className="d-flex sel_blo">
                       <span>Select Country:</span>
                       <select className="form-select formcontrol" name="country" value={selectedCountry}
-                        onChange={(e) => { setSelectedCountry(e.target.value); setSelectedCity(''); setSelectedType(''); setSelectedExpo(null); }}>
+                        onChange={(e) => { setSelectedCountry(e.target.value); setSelectedCity(''); setSelectedType(''); setSelectedExpo(null); setSelStallId(''); }}>
                         <option value="" >
                           Select
                         </option>
@@ -374,11 +475,11 @@ const BookaStall = () => {
                       </select>
                     </div>
                   </div>
-                  <div className="col-md-3 stateBox">
+                  <div className="col-md-4 stateBox">
                     <div className="d-flex sel_blo">
                       <span>Select City:</span>
                       <select className="form-select formcontrol" name="city" value={selectedCity}
-                        onChange={(e) => { setSelectedCity(e.target.value); setSelectedType(''); setSelectedExpo(null); }}>
+                        onChange={(e) => { setSelectedCity(e.target.value); setSelectedType(''); setSelectedExpo(null); setSelStallId(''); }}>
                         <option value="">
                           Select
                         </option>
@@ -392,19 +493,19 @@ const BookaStall = () => {
                       </select>
                     </div>
                   </div>
-                  <div className="col-md-3">
+                  <div className="col-md-4">
                     <div className="d-flex sel_blo sel_bloo">
                       <span>Expo Type:</span>
                       <select className="form-select formcontrol" name="type" value={selectedType}
-                        onChange={(e) => { setSelectedType(e.target.value); setSelectedExpo(null); }}>
+                        onChange={(e) => { setSelectedType(e.target.value); setSelectedExpo(null); setSelStallId(''); }}>
                         <option value="">
                           Select
                         </option>
                         {[...new Set(expos
                           .filter((cExpo) => (!selectedCountry || cExpo.expoCountry === selectedCountry) && (!selectedCity || cExpo.expoCity === selectedCity))
-                          .map((cExpo) => cExpo))].map((cExpo, index) => (
-                            <option key={index} value={cExpo.expoType}>
-                              {cExpo.expoType}
+                          .map((cExpo) => cExpo.expoType))].map((expoType, index) => (
+                            <option key={index} value={expoType}>
+                              {expoType}
                             </option>
                           ))}
                       </select>
@@ -437,8 +538,8 @@ const BookaStall = () => {
                               <h6>
                                 THE METAVERSE <span>{selectedExpo.name}</span> REALESTATE EXPO
                               </h6>
-                              <h6 className="vald-ot">10 &amp; 11 - March-2024</h6>
-                              <h3>₹ {stallPrice ? stallPrice : '-'} / 1 Expo </h3>
+                              {/* <h6 className="vald-ot">10 &amp; 11 - March-2024</h6> */}
+                              <h3>₹ {stallPrice ? stallPrice : '-'}</h3>
                               <button className="purchage-btn" onClick={handleShow} href="#" role="button">
                                 BOOK NOW
                               </button>
@@ -477,23 +578,20 @@ const BookaStall = () => {
                   <Modal.Header closeButton>
                     <div className='row w-100 '>
                       <div className='col-md-6'>
-                        <div className="row">
-                          <div className="col-md-8">
-                            <h3>Expo Layout-Plan</h3>
+                        <div className="row align-items-center">
+                          <div className="col-md-7">
+                            <h3 className="mb-0">Expo Layout-Plan</h3>
                           </div>
-                          <div className="col-md-4">
-                            {/* <h3>Select Month</h3> */}
-                            <select className="form-control">
-                              <option value="Select Month">Select Month</option>
-                              <option value="January">January</option>
-                              <option value="February">February</option>
-                              <option value="March">March</option>
-                              <option value="March">April</option>
-                              <option value="March">May</option>
-                              <option value="March">June</option>
-                              <option value="March">July</option>
-                              <option value="March">August</option>
-                              <option value="March">September</option>
+                          <div className="col-md-5">
+                            <select
+                              className="form-control"
+                              value={selectedMonth}
+                              onChange={(e) => { setSelectedMonth(e.target.value); setSelStallId(''); }}
+                            >
+                              <option value="">Select Month</option>
+                              {monthsList.map((m, index) => (
+                                <option key={index} value={m}>{m}</option>
+                              ))}
                             </select>
                           </div>
                         </div>
@@ -515,7 +613,7 @@ const BookaStall = () => {
                             <button
                               className={expoStallsDetails["D1"] ? "booked cursor-notallowed" : selStallId === "D1" ? "selected" : ""}
                               onClick={() => onSelectStall("D1", "Diamond")}
-                              disabled={expoStallsDetails["D1"] === "selected" ? false : expoStallsDetails["D1"] ? true : false}
+                              disabled={Boolean(expoStallsDetails["D1"])}
                             >
                               D
                             </button>
@@ -527,7 +625,7 @@ const BookaStall = () => {
                                 key={stall}
                                 className={`${stall.toLowerCase()} ${expoStallsDetails[stall] ? "booked cursor-notallowed" : selStallId === stall ? "selected" : ""}`}
                                 onClick={() => onSelectStall(stall, "Platinum")}
-                                disabled={expoStallsDetails[stall] === "selected" ? false : expoStallsDetails[stall] ? true : false}
+                                disabled={Boolean(expoStallsDetails[stall])}
                               >
                                 {stall}
                               </button>
@@ -540,7 +638,7 @@ const BookaStall = () => {
                                 key={stall}
                                 className={`${stall.toLowerCase()} ${expoStallsDetails[stall] ? "booked cursor-notallowed" : selStallId === stall ? "selected" : ""}`}
                                 onClick={() => onSelectStall(stall, "Gold")}
-                                disabled={expoStallsDetails[stall] === "selected" ? false : expoStallsDetails[stall] ? true : false}
+                                disabled={Boolean(expoStallsDetails[stall])}
                               >
                                 {stall}
                               </button>
@@ -564,7 +662,7 @@ const BookaStall = () => {
                                   key={stallKey}
                                   className={className}
                                   onClick={() => onSelectStall(stallKey, "Standard")}
-                                  disabled={expoStallsDetails[stallKey] === "selected" ? false : expoStallsDetails[stallKey] ? true : false}
+                                  disabled={Boolean(expoStallsDetails[stallKey])}
                                 >
                                   {stallKey}
                                 </button>

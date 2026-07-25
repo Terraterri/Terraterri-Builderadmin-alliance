@@ -44,7 +44,7 @@ const OngoingExpo = () => {
                       <li className="breadcrumb-item">
                         <a href="/">Home</a>
                       </li>
-                      <li className="breadcrumb-item active">Future Expos</li>
+                      <li className="breadcrumb-item active">Ongoing Expos</li>
                     </ol>
                   </div>
                 </div>
@@ -55,7 +55,7 @@ const OngoingExpo = () => {
               <div className="col-md-12">
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="card-title">Future Expo</h3>
+                    <h3 className="card-title">Ongoing Expo</h3>
                     <div className="mb-0 d-flex">
 
                       <select className='form-select ml-2'>
