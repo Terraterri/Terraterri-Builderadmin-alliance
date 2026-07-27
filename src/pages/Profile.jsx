@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Offcanvas from 'react-bootstrap/Offcanvas';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -9,7 +9,18 @@ import { toastError, toastSuccess } from '../utils/toast';
 import { updateUserData } from '../store/slices/UserSlice';
 
 const Profile = () => {
-  let userData = useSelector((state) => state.user.userData)
+  const userDataRaw = useSelector((state) => state.user.userData);
+  const userData = useMemo(() => {
+    if (!userDataRaw) return {};
+    const combined = userDataRaw.builder
+      ? { ...userDataRaw, ...userDataRaw.builder, id: userDataRaw.id, builder_id: userDataRaw.builder.id }
+      : { ...userDataRaw };
+
+    if (combined.location && !combined.locations) {
+      combined.locations = Array.isArray(combined.location) ? combined.location : [combined.location];
+    }
+    return combined;
+  }, [userDataRaw]);
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ logo_path: userData?.logo_path });
@@ -20,7 +31,7 @@ const Profile = () => {
   const [editForm, setEditForm] = useState(userData);
 
   // Dynamic locations for "add" mode
-  const [locations, setLocations] = useState([{ id: Date.now(), country_code: '', state_code: '', city: '', mobile: '', email: '', address: '', contact_person_name: '' }]);
+  const [locations, setLocations] = useState([{ id: Date.now(), country_code: '', state_code: '', city: '', mobile: '', mobile2: '', email: '', address: '', contact_person_name: '' }]);
   // Dynamic locations for "edit" mode
   const [editLocations, setEditLocations] = useState([]);
   // Per-location dropdown data (keyed by location id)
@@ -64,7 +75,7 @@ const Profile = () => {
       } catch (e) { console.log(e); }
     }
   };
-  const addLocation = () => setLocations(prev => [...prev, { id: Date.now(), country_code: '', state_code: '', city: '', mobile: '', email: '', address: '', contact_person_name: '' }]);
+  const addLocation = () => setLocations(prev => [...prev, { id: Date.now(), country_code: '', state_code: '', city: '', mobile: '', mobile2: '', email: '', address: '', contact_person_name: '' }]);
   const removeLocation = (locId) => { if (locations.length > 1) setLocations(prev => prev.filter(l => l.id !== locId)); };
 
   // --- Dynamic location handlers (edit mode) ---
@@ -83,7 +94,7 @@ const Profile = () => {
       } catch (e) { console.log(e); }
     }
   };
-  const addEditLocation = () => setEditLocations(prev => [...prev, { id: Date.now(), country_code: '', state_code: '', city: '', address: '', contact_person_name: '', email: '', mobile: '' }]);
+  const addEditLocation = () => setEditLocations(prev => [...prev, { id: Date.now(), country_code: '', state_code: '', city: '', address: '', contact_person_name: '', email: '', mobile: '', mobile2: '' }]);
   const removeEditLocation = (locId) => { if (editLocations.length > 1) setEditLocations(prev => prev.filter(l => l.id !== locId)); };
 
   const handleImage = async (e, type) => {
@@ -168,8 +179,25 @@ const Profile = () => {
   const handleSubmit = async () => {
     setFormError({});
     setLoading(true)
-    const payload = { ...form, userid: userData.id, name: userData.company_name };
-    
+    const payload = { ...userData, ...form, userid: userData.id, name: userData.company_name, _method: 'PATCH' };
+    let errors = {};
+    const requiredFields = [
+      'headoffice_location', 'md_name', 'md_phone_number', 'md_email',
+      'company_email', 'company_contact', 'cp_manager_name',
+      'cp_manager_phone_number', 'cp_manager_email', 'cp_company_pan', 'cp_gst_number'
+    ];
+    requiredFields.forEach(field => {
+      if (!payload[field] || String(payload[field]).trim() === '') {
+        errors[field] = 'This field is required';
+      }
+    });
+    if (Object.keys(errors).length > 0) {
+      setFormError(errors);
+      setLoading(false);
+      return;
+    }
+
+
     payload.locations = locations.map((loc) => ({
       country: loc.country_code,
       state: loc.state_code,
@@ -177,12 +205,13 @@ const Profile = () => {
       address: loc.address || "",
       contact_person_name: loc.contact_person_name || "",
       contact_person_phone_number: loc.mobile,
+      contact_person_phone_number_2: loc.mobile2 || "",
       contact_person_mail: loc.email || ""
     }));
     try {
-      let res = await masterClient.post('builder', payload)
+      let res = await masterClient.post(`builder/${userData.id}`, payload)
       if (res?.data.status) {
-        toastSuccess('Profile Added Successfully');
+        toastSuccess('Profile Completed Successfully');
         getBuilderData();
       } else {
         toastError('Failed!, Please try again')
@@ -224,20 +253,44 @@ const Profile = () => {
   const handleUpdate = async () => {
     setFormError({});
     setLoading(true)
-    const payload = { ...editForm, userid: editForm.id };
-    
-    payload.locations = editLocations.map((loc) => ({
-      id: loc.id,
-      country: loc.country_code || "",
-      state: loc.state_code || "",
-      city: loc.city || "",
-      address: loc.address || "",
-      contact_person_name: loc.contact_person_name || "",
-      contact_person_phone_number: loc.mobile || "",
-      contact_person_mail: loc.email || ""
-    }));
+    const payload = { ...editForm, userid: editForm.id, _method: 'PATCH' };
+    let errors = {};
+    const requiredFields = [
+      'headoffice_location', 'md_name', 'md_phone_number', 'md_email',
+      'company_email', 'company_contact', 'cp_manager_name',
+      'cp_manager_phone_number', 'cp_manager_email', 'cp_company_pan', 'cp_gst_number'
+    ];
+    requiredFields.forEach(field => {
+      if (!payload[field] || String(payload[field]).trim() === '') {
+        errors[field] = 'This field is required';
+      }
+    });
+    if (Object.keys(errors).length > 0) {
+      setFormError(errors);
+      setLoading(false);
+      return;
+    }
+
+
+    payload.locations = editLocations.map((loc) => {
+      let mappedLoc = {
+        country: loc.country_code || "",
+        state: loc.state_code || "",
+        city: loc.city || "",
+        address: loc.address || "",
+        contact_person_name: loc.contact_person_name || "",
+        contact_person_phone_number: loc.mobile || "",
+        contact_person_phone_number_2: loc.mobile2 || "",
+        contact_person_mail: loc.email || ""
+      };
+      // Only send the ID if it's a valid DB ID, not a temporary timestamp generated by Date.now()
+      if (loc.id && loc.id < 10000000000) {
+        mappedLoc.id = loc.id;
+      }
+      return mappedLoc;
+    });
     try {
-      const res = await masterClient.patch(`builder/${editForm.id}`, payload);
+      const res = await masterClient.post(`builder/${editForm.id}`, payload);
       if (res?.data?.status) {
         toastSuccess('Updated Successfully')
         setShow(false)
@@ -281,24 +334,42 @@ const Profile = () => {
           address: loc.address || '',
           contact_person_name: loc.contact_person_name || '',
           mobile: loc.contact_person_phone_number || '',
+          mobile2: loc.contact_person_phone_number_2 || '',
           email: loc.contact_person_mail || loc.email || ''
         }));
       } else {
         const suffixes = ['one', 'two', 'three'];
         suffixes.forEach((s, i) => {
           if (userData[`location_${s}`]) {
-            locs.push({ id: i + 1, city: userData[`location_${s}`], email: userData[`location_${s}_email`] || '', mobile: userData[`location_${s}_mobile`] || '' });
+            locs.push({ id: i + 1, city: userData[`location_${s}`], email: userData[`location_${s}_email`] || '', mobile: userData[`location_${s}_mobile`] || '', mobile2: userData[`location_${s}_mobile2`] || '' });
           }
         });
         // Also check numbered locations beyond 3
         let idx = 4;
         while (userData[`location_${idx}`]) {
-          locs.push({ id: idx, city: userData[`location_${idx}`], email: userData[`location_${idx}_email`] || '', mobile: userData[`location_${idx}_mobile`] || '' });
+          locs.push({ id: idx, city: userData[`location_${idx}`], email: userData[`location_${idx}_email`] || '', mobile: userData[`location_${idx}_mobile`] || '', mobile2: userData[`location_${idx}_mobile2`] || '' });
           idx++;
         }
       }
-      if (locs.length > 0) setEditLocations(locs);
-      else setEditLocations([{ id: Date.now(), country_code: '', state_code: '', city: '', address: '', contact_person_name: '', mobile: '', email: '' }]);
+      if (locs.length > 0) {
+        setEditLocations(locs);
+        // Pre-fetch states and cities for each location to populate dropdowns
+        locs.forEach(async (loc) => {
+          if (loc.country_code) {
+            try {
+              const res = await masterClient.get(`state/${loc.country_code}`);
+              if (res?.data?.status) setLocationStates(prev => ({ ...prev, [`edit_${loc.id}`]: res.data.data }));
+            } catch (e) { console.log(e); }
+          }
+          if (loc.state_code) {
+            try {
+              const res = await masterClient.get(`city/${loc.state_code}`);
+              if (res?.data?.status) setLocationCities(prev => ({ ...prev, [`edit_${loc.id}`]: res.data.data }));
+            } catch (e) { console.log(e); }
+          }
+        });
+      }
+      else setEditLocations([{ id: Date.now(), country_code: '', state_code: '', city: '', address: '', contact_person_name: '', mobile: '', mobile2: '', email: '' }]);
     }
   }, [userData, show])
 
@@ -342,10 +413,8 @@ const Profile = () => {
                           <div className="d-flex align-items-center">
                             {form?.logo_path == null ?
                               <div className="text-center" style={{ minWidth: '150px' }}>
-                                <label htmlFor="logo_upload" className="d-flex flex-column align-items-center justify-content-center"
-                                  style={{ cursor: 'pointer', border: '2px dashed #c4d8f8', borderRadius: '8px', padding: '15px 10px', background: '#f8f9fc' }}>
-                                  <i className="mdi mdi-cloud-upload" style={{ fontSize: '28px', color: '#4199d8' }}></i>
-                                  <span style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>Upload Avatar</span>
+                                <label htmlFor="logo_upload" className="d-flex flex-column align-items-center justify-content-center">
+                                  <span style={{ fontSize: '13px', color: '#555', marginTop: '4px', marginBottom: '4px' }}>Upload Logo</span>
                                 </label>
                                 <input
                                   id="logo_upload"
@@ -412,7 +481,7 @@ const Profile = () => {
 
                         <div className='col-md-6 mb-3'>
                           <div>
-                            <div className='d-flex'>
+                            <div className='form-group-col'>
                               <label>MD Name: </label>
                               {userData.md_name == null ?
                                 <input
@@ -434,7 +503,7 @@ const Profile = () => {
 
                         <div className='col-md-6 mb-3'>
                           <div>
-                            <div className='d-flex'>
+                            <div className='form-group-col'>
                               <label>MD Phone Number : </label>
                               {userData.md_phone_number == null ?
                                 <input
@@ -453,12 +522,12 @@ const Profile = () => {
                         </div>
 
                         <div className='col-md-6 px-0'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>MD Email : </label>
                             {userData.md_email == null ?
                               <input
                                 type="text"
-                                className="form-control formContoler"
+                                className={`form-control formContoler ${formError.md_email ? 'is-invalid' : ''}`}
                                 name='md_email'
                                 placeholder='Enter Email'
                                 onChange={handleForm}
@@ -466,6 +535,7 @@ const Profile = () => {
                               :
                               <span>{userData.md_email}</span>
                             }
+                            {formError.md_email && <p className='text-danger err mb-0' style={{ fontSize: '12px' }}>{formError.md_email}</p>}
                           </div>
                         </div>
                       </div>
@@ -476,12 +546,12 @@ const Profile = () => {
 
                       <div className='row'>
                         <div className='col-md-6 mb-3'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>Company Email :</label>
                             {userData.company_email == null ?
                               <input
                                 type="text"
-                                className="form-control formContoler"
+                                className={`form-control formContoler ${formError.company_email ? 'is-invalid' : ''}`}
                                 name='company_email'
                                 placeholder='Enter Company Email'
                                 onChange={handleForm}
@@ -489,15 +559,16 @@ const Profile = () => {
                               :
                               <span>{userData.company_email}</span>
                             }
+                            {formError.company_email && <p className='text-danger err mb-0' style={{ fontSize: '12px' }}>{formError.company_email}</p>}
                           </div>
                         </div>
                         <div className='col-md-6 mb-3'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>Company Contact :</label>
                             {userData.company_contact == null ?
                               <input
                                 type="text"
-                                className="form-control formContoler"
+                                className={`form-control formContoler ${formError.company_contact ? 'is-invalid' : ''}`}
                                 name='company_contact'
                                 placeholder='Enter Company Contact'
                                 onChange={handleForm}
@@ -505,11 +576,12 @@ const Profile = () => {
                               :
                               <span>{userData.company_contact}</span>
                             }
+                            {formError.company_contact && <p className='text-danger err mb-0' style={{ fontSize: '12px' }}>{formError.company_contact}</p>}
                           </div>
                         </div>
                         <div className='col-md-6 mb-3'>
                           <div>
-                            <div className='d-flex'>
+                            <div className='form-group-col'>
                               <label>Manager Name :</label>
                               {userData.cp_manager_name == null ?
                                 <input
@@ -529,7 +601,7 @@ const Profile = () => {
 
                         <div className='col-md-6 mb-3'>
                           <div>
-                            <div className='d-flex'>
+                            <div className='form-group-col'>
                               <label>Company Manager Number :</label>
                               {userData.cp_manager_phone_number == null ?
                                 <input
@@ -548,12 +620,12 @@ const Profile = () => {
                         </div>
 
                         <div className='col-md-6 px-0'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>Company Manger Email : </label>
                             {userData.cp_manager_email == null ?
                               <input
                                 type="text"
-                                className="form-control formContoler"
+                                className={`form-control formContoler ${formError.cp_manager_email ? 'is-invalid' : ''}`}
                                 name='cp_manager_email'
                                 placeholder='Manager Email'
                                 onChange={handleForm}
@@ -561,6 +633,7 @@ const Profile = () => {
                               :
                               <span>{userData.cp_manager_email}</span>
                             }
+                            {formError.cp_manager_email && <p className='text-danger err mb-0' style={{ fontSize: '12px' }}>{formError.cp_manager_email}</p>}
                           </div>
                         </div>
                       </div>
@@ -574,12 +647,12 @@ const Profile = () => {
 
 
                         <div className='col-md-6 mb-3'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>Company  Pan : </label>
-                            {userData.cp_manager_email == null ?
+                            {userData.cp_company_pan == null ?
                               <input
                                 type="text"
-                                className="form-control formContoler"
+                                className={`form-control formContoler ${formError.cp_company_pan ? 'is-invalid' : ''}`}
                                 name='cp_company_pan'
                                 placeholder='Company Pan'
                                 onChange={handleForm}
@@ -587,17 +660,17 @@ const Profile = () => {
                               :
                               <span>{userData.cp_company_pan}</span>
                             }
-
+                            {formError.cp_company_pan && <p className='text-danger err mb-0' style={{ fontSize: '12px' }}>{formError.cp_company_pan}</p>}
                           </div>
                         </div>
 
                         <div className='col-md-6 mb-3'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>Company GST Number : </label>
                             {userData.cp_gst_number == null ?
                               <input
                                 type="text"
-                                className="form-control formContoler"
+                                className={`form-control formContoler ${formError.cp_gst_number ? 'is-invalid' : ''}`}
                                 name='cp_gst_number'
                                 placeholder='Enter GST Number'
                                 onChange={handleForm}
@@ -605,10 +678,11 @@ const Profile = () => {
                               :
                               <span>{userData.cp_gst_number}</span>
                             }
+                            {formError.cp_gst_number && <p className='text-danger err mb-0' style={{ fontSize: '12px' }}>{formError.cp_gst_number}</p>}
                           </div>
                         </div>
                         <div className='col-md-6 px-0'>
-                          <div className='d-flex'>
+                          <div className='form-group-col'>
                             <label>RERA Number : </label>
                             {/* {userData.cp_gst_number == null ?
                               <input
@@ -649,6 +723,7 @@ const Profile = () => {
                         const existingLoc = userData.locations && userData.locations[idx];
                         const existingCity = existingLoc ? existingLoc.city : userData[locKey];
                         const existingMobile = existingLoc ? existingLoc.contact_person_phone_number : userData[`${locKey}_mobile`];
+                        const existingMobile2 = existingLoc ? existingLoc.contact_person_phone_number_2 : userData[`${locKey}_mobile2`];
                         const existingEmail = existingLoc ? (existingLoc.contact_person_mail || existingLoc.email) : userData[`${locKey}_email`];
 
                         return (
@@ -660,7 +735,7 @@ const Profile = () => {
                                 }</h5>
                                 {existingMobile != null &&
                                   <h5 className='ml-3 mb-0' style={{ marginLeft: '15px' }}>📞
-                                    <span>{existingMobile}</span>
+                                    <span>{existingMobile}</span> {existingMobile2 ? `/ ${existingMobile2}` : ''}
                                   </h5>
                                 }
                                 {existingEmail != null &&
@@ -679,8 +754,8 @@ const Profile = () => {
                             {existingCity == null &&
                               <>
                                 <div className='col-md-4 mb-3'>
-                                  <div className='d-flex'>
-                                    <label>Select Country : </label>
+                                  <div className='form-group-col'>
+                                    <label>Country : </label>
                                     <select
                                       className="form-control formContoler"
                                       value={loc.country_code}
@@ -694,8 +769,8 @@ const Profile = () => {
                                   </div>
                                 </div>
                                 <div className='col-md-4 mb-3'>
-                                  <div className='d-flex'>
-                                    <label>Select State : </label>
+                                  <div className='form-group-col'>
+                                    <label>State : </label>
                                     <select
                                       className="form-control formContoler"
                                       value={loc.state_code}
@@ -709,8 +784,8 @@ const Profile = () => {
                                   </div>
                                 </div>
                                 <div className='col-md-4 mb-3'>
-                                  <div className="d-flex">
-                                    <label>Select City</label>
+                                  <div className="form-group-col">
+                                    <label>City</label>
                                     <select
                                       className="form-control formContoler"
                                       value={loc.city}
@@ -723,9 +798,9 @@ const Profile = () => {
                                     </select>
                                   </div>
                                 </div>
-                                <div className='col-md-6 mb-3'>
-                                  <div className='d-flex'>
-                                    <label>Enter Mobile : </label>
+                                <div className='col-md-4 mb-3'>
+                                  <div className='form-group-col'>
+                                    <label style={{ whiteSpace: "nowrap", marginRight: "10px" }}>Contact Number 1 : </label>
                                     <input
                                       className="form-control formContoler"
                                       type="text"
@@ -734,9 +809,20 @@ const Profile = () => {
                                     />
                                   </div>
                                 </div>
-                                <div className='col-md-6 mb-3'>
-                                  <div className='d-flex'>
-                                    <label>Email : </label>
+                                <div className='col-md-4 mb-3'>
+                                  <div className='form-group-col'>
+                                    <label style={{ whiteSpace: "nowrap", marginRight: "10px" }}>Contact Number 2 : </label>
+                                    <input
+                                      className="form-control formContoler"
+                                      type="text"
+                                      value={loc.mobile2}
+                                      onChange={(e) => handleLocationChange(loc.id, 'mobile2', e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className='col-md-4 mb-3'>
+                                  <div className='form-group-col'>
+                                    <label style={{ whiteSpace: "nowrap", marginRight: "10px" }}>Email : </label>
                                     <input
                                       className="form-control formContoler"
                                       type="text"
@@ -751,14 +837,13 @@ const Profile = () => {
                         );
                       })}
 
-                      {userData.headoffice_location == null &&
 
-                        <div className="page-title-right d-flex justify-content-end mt-2">
-                          <button className="btn btn-info" onClick={handleSubmit}>
-                            Complete Profile
-                          </button>
-                        </div>
-                      }
+
+                      <div className="page-title-right d-flex justify-content-end mt-2">
+                        <button className="btn btn-info" onClick={handleSubmit}>
+                          Complete Profile
+                        </button>
+                      </div>
 
 
                     </div>
@@ -981,19 +1066,76 @@ const Profile = () => {
                           <button className="btn btn-danger btn-sm" type="button" onClick={() => removeEditLocation(loc.id)}>Remove</button>
                         }
                       </div>
-                      <div className="col-md-4">
+                      <div className="col-md-4 mb-3">
+                        <div className="form-floating">
+                          <select
+                            className="form-select"
+                            value={loc.country_code || ''}
+                            onChange={(e) => handleEditLocationChange(loc.id, 'country_code', e.target.value)}
+                          >
+                            <option value="">Select Country</option>
+                            {countries.map((country, i) => (
+                              <option key={i + 1} value={country.country_code}>{country.country_name}</option>
+                            ))}
+                          </select>
+                          <label className="fw-normal">Country</label>
+                        </div>
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <div className="form-floating">
+                          <select
+                            className="form-select"
+                            value={loc.state_code || ''}
+                            onChange={(e) => handleEditLocationChange(loc.id, 'state_code', e.target.value)}
+                          >
+                            <option value="">Select State</option>
+                            {(locationStates[`edit_${loc.id}`] || []).map((state, i) => (
+                              <option key={i + 1} value={state.state_code}>{state.state_name}</option>
+                            ))}
+                          </select>
+                          <label className="fw-normal">State</label>
+                        </div>
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <div className="form-floating">
+                          <select
+                            className="form-select"
+                            value={loc.city || ''}
+                            onChange={(e) => handleEditLocationChange(loc.id, 'city', e.target.value)}
+                          >
+                            <option value="">Select City</option>
+                            {(locationCities[`edit_${loc.id}`] || []).map((city, i) => (
+                              <option key={i + 1} value={city.city_code}>{city.city_name}</option>
+                            ))}
+                          </select>
+                          <label className="fw-normal">City</label>
+                        </div>
+                      </div>
+                      <div className="col-md-4 mb-3">
                         <div className="form-floating">
                           <input
                             type="text"
                             className="form-control"
-                            placeholder="Location"
-                            value={loc.city || ''}
-                            readOnly
+                            placeholder="Contact Number 1"
+                            value={loc.mobile || ''}
+                            onChange={(e) => handleEditLocationChange(loc.id, 'mobile', e.target.value)}
                           />
-                          <label className="fw-normal">Location</label>
+                          <label className="fw-normal">Contact Number 1</label>
                         </div>
                       </div>
-                      <div className="col-md-4">
+                      <div className="col-md-4 mb-3">
+                        <div className="form-floating">
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Contact Number 2"
+                            value={loc.mobile2 || ''}
+                            onChange={(e) => handleEditLocationChange(loc.id, 'mobile2', e.target.value)}
+                          />
+                          <label className="fw-normal">Contact Number 2</label>
+                        </div>
+                      </div>
+                      <div className="col-md-4 mb-3">
                         <div className="form-floating">
                           <input
                             type="text"
@@ -1003,18 +1145,6 @@ const Profile = () => {
                             onChange={(e) => handleEditLocationChange(loc.id, 'email', e.target.value)}
                           />
                           <label className="fw-normal">Enter Mail ID</label>
-                        </div>
-                      </div>
-                      <div className="col-md-4">
-                        <div className="form-floating">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Location Number"
-                            value={loc.mobile || ''}
-                            onChange={(e) => handleEditLocationChange(loc.id, 'mobile', e.target.value)}
-                          />
-                          <label className="fw-normal">Enter Mobile Number</label>
                         </div>
                       </div>
                     </div>

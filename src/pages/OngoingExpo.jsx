@@ -6,6 +6,13 @@ import { GoEye } from "react-icons/go";
 import { expoApiClient } from '../utils/httpClient';
 import Loader from '../components/Loader';
 import { useSelector } from 'react-redux';
+import moment from 'moment';
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parsed = moment(dateStr, ['YYYY-MM-DD', 'DD-MM-YYYY', 'YYYY/MM/DD', 'YYYY-MM-DD HH:mm:ss']);
+  return parsed.isValid() ? parsed.format('DD-MM-YYYY') : dateStr;
+};
 const OngoingExpo = () => {
   const userData = useSelector(state => state.user.userData);
   const [futureExpos, setFutureExpos] = useState([]);
@@ -94,8 +101,8 @@ const OngoingExpo = () => {
                             <th>Stall Type</th>
                             <th>Stall Number</th>
                             <th>City</th>
-                            <th>Month</th>
-                            <th>Year</th>
+                            <th>Stall Started Date</th>
+                            <th>Stall Ended Date</th>
                             <th>Edit</th>
                             <th>View</th>
                           </tr>
@@ -109,8 +116,8 @@ const OngoingExpo = () => {
                               <td>{expo.stallType}</td>
                               <td>{expo.stallNumber}</td>
                               <td>{expo.expoCity}</td>
-                              <td>{expo.fromDate}</td>
-                              <td>{expo.toDate}</td>
+                              <td>{formatDate(expo.bookingStartDate)}</td>
+                              <td>{formatDate(expo.bookingEndDate)}</td>
                               <td>
                                 <Link to={`/stall/management/${expo.stallInfoId}`}>
                                   <FaRegEdit />

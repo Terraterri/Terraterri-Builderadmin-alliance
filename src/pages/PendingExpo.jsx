@@ -5,6 +5,10 @@ import { expoApiClient } from '../utils/httpClient';
 import Loader from '../components/Loader';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import moment from 'moment';
+
+
+
 const PendingExpo = () => {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user.userData);
@@ -16,7 +20,11 @@ const PendingExpo = () => {
       state: { expoCode: expoCode, stallCode: stallCode, newStallId: newStallId }
     });
   };
-
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parsed = moment(dateStr, ['YYYY-MM-DD', 'DD-MM-YYYY', 'YYYY/MM/DD', 'YYYY-MM-DD HH:mm:ss']);
+  return parsed.isValid() ? parsed.format('DD-MM-YYYY') : dateStr;
+};
 
   const getExpoStalls = async () => {
     setLoading(true)
@@ -88,8 +96,8 @@ const PendingExpo = () => {
                             <th>Expo Code</th>
                             <th>Expo Type</th>
                             <th>City</th>
-                            <th>Month</th>
-                            <th>Year</th>
+                            <th>Stall Started Date</th>
+                            <th>Stall Ended Date</th>
                             <th>Stall No</th>
                             <th className='text-center'>Action</th>
                           </tr>
@@ -104,8 +112,8 @@ const PendingExpo = () => {
                                 </td>
                                 <td>{ele.expoType}</td>
                                 <td>{ele.expoCity}</td>
-                                <td>{ele.fromDate}</td>
-                                <td>{ele.toDate}</td>
+                                <td>{formatDate(ele.bookingStartDate)}</td>
+                                <td>{formatDate(ele.bookingEndDate)}</td>
                                 <td>{ele.stallNumber} </td>
                                 <td className='text-center'>
                                   <span className='sta_icon' onClick={() => goToAddExecutive(ele.expoUnqCode, ele.stallNumber, ele.newStallId)}>

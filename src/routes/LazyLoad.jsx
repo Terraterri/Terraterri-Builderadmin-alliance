@@ -29,6 +29,8 @@ const LazyLoad = () => {
   const Ebroucher = lazy(() => import(`../pages/Lists/Ebroucher`));
   const DropMessage = lazy(() => import(`../pages/Lists/DropMessage`));
   const EnquiryList = lazy(() => import(`../pages/Lists/EnquiryList`));
+  const StallVisitedUsers = lazy(() => import(`../pages/Lists/StallVisitedUsers`));
+  const StallEnquiredUsers = lazy(() => import(`../pages/Lists/StallEnquiredUsers`));
   const WhatsappCall = lazy(() => import(`../pages/Lists/WhatsappCall`));
   const ExecutiveLogin = lazy(() => import(`../pages/ExecutiveLogin`));
   const Executivedashboard = lazy(() => import(`../pages/Executivedashboard`));
@@ -161,6 +163,8 @@ const LazyLoad = () => {
         <Route path="/ebroucher" element={<Ebroucher />} />
         <Route path="/dropmessage" element={<DropMessage />} />
         <Route path="/enquirylist" element={<EnquiryList />} />
+        <Route path="/stall-visited-users" element={<StallVisitedUsers />} />
+        <Route path="/stall-enquired-users" element={<StallEnquiredUsers />} />
         <Route path="/whatsappcall" element={<WhatsappCall />} />
         <Route path="/listing-expos" element={<AllexpoListings />} />
 

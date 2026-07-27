@@ -47,6 +47,10 @@ const BookaStall = () => {
 
   const [stallPrice, setStallPrice] = useState('')
 
+  const numericPrice = parseFloat(stallPrice) || 0;
+  const estimatedGst = numericPrice ? (numericPrice * 0.18) : 0;
+  const totalPayableAmount = numericPrice + estimatedGst;
+
   const [expoStallsDetails, setExpoStallDetails] = useState({})
 
   const [selStallId, setSelStallId] = useState('')
@@ -826,13 +830,13 @@ const BookaStall = () => {
                               <div className="col-md-12 text-right">
                                 <div>
                                   <p className="rate_out d-flex align-items-center justify-content-end mb-0">
-                                    Package Amout : <span className="pric_blo">₹ {stallPrice}</span>
+                                    Package Amout : <span className="pric_blo">₹ {stallPrice ? stallPrice : 0}</span>
                                   </p>
                                   <p className="rate_out d-flex align-items-center justify-content-end mb-0">
-                                    Estimated Gst : <span className="pric_blo">₹ 19440</span>
+                                    Estimated GST : <span className="pric_blo">₹ {estimatedGst ? (Number.isInteger(estimatedGst) ? estimatedGst : estimatedGst.toFixed(2)) : 0}</span>
                                   </p>
                                   <p className="total-amt d-flex align-items-center justify-content-end mb-0 br-top">
-                                    Total Payable Amount : <span className="pric_blo">₹127440</span>
+                                    Total Payable Amount : <span className="pric_blo">₹ {totalPayableAmount ? (Number.isInteger(totalPayableAmount) ? totalPayableAmount : totalPayableAmount.toFixed(2)) : 0}</span>
                                   </p>
                                 </div>
                               </div>

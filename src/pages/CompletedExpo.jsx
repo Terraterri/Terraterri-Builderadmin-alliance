@@ -1,13 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Offcanvas from 'react-bootstrap/Offcanvas';
+import { FaRegEdit } from "react-icons/fa";
 import { GoEye } from "react-icons/go";
+import { expoApiClient } from '../utils/httpClient';
+import { useSelector } from 'react-redux';
+import moment from 'moment';
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parsed = moment(dateStr, ['YYYY-MM-DD', 'DD-MM-YYYY', 'YYYY/MM/DD', 'YYYY-MM-DD HH:mm:ss']);
+  return parsed.isValid() ? parsed.format('DD-MM-YYYY') : dateStr;
+};
 
 
 const CompletedExpo = () => {
+  const userData = useSelector(state => state.user.userData);
 
   const [show, setShow] = useState(false);
+  const [futureExpos, setFutureExpos] = useState([]);
+  const [loading, setLoading] = useState(false);
 
+    const fetchFutureExpos = async () => {
+    setLoading(true);
+    try {
+      const response = await expoApiClient.get(`/stallBooking/getBuilderCompletedStalls.php?builderId=${userData.id}`);
+      if (response?.data?.status) {
+        setFutureExpos(response.data?.data);
+      }
+    } catch (error) {
+      console.error('fetchFutureExpos -> error', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
+  useEffect(() => {
+    fetchFutureExpos();
+  }, []);
 
   return (
     <>
@@ -79,44 +110,51 @@ const CompletedExpo = () => {
                   </div>
                   <div className="card-body expo_reg_out">
                     <div className="table-responsive-md">
-                      <table className="table text-nowrap mb-0">
+                    <table className="table text-nowrap mb-0">
                         <thead>
                           <tr>
                             <th>S.no</th>
                             <th>Expo Code</th>
                             <th>Expo Type</th>
+                            <th>Stall Type</th>
+                            <th>Stall Number</th>
                             <th>City</th>
-                        <th>Month</th>
-                            <th>Year</th>
+                            <th>Stall Started Date</th>
+                            <th>Stall Ended Date</th>
+                            <th>Edit</th>
                             <th>View</th>
-
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td>1</td>
-                            <td>
-                              <span className='exp-cde'>INHYDJAN08-2024</span>
-                              <ul className='d-flex'>
-                                <li>
-                                  <Link to="/noofexecutiveswise">
-                                    No of Visitors Executive Wise
-                                  </Link>
-                                </li>
-                              </ul>
-                            </td>
-                            <td>Residential</td>
-                            <td>Hyderabad</td>
-                            <td>02-02-2024</td>
-                            <td>03-02-2024 </td>
-                            <td>
-                              <Link to="/expo/details">
-                                <span className='sta_iconn'>
-                                  <GoEye />
-                                </span>
-                              </Link>
-                            </td>
-                          </tr>
+                          {futureExpos.length > 0 ? futureExpos.map((expo, index) => (
+                            <tr key={index}>
+                              <td>{index + 1}</td>
+                              <td>{expo.expoUnqCode}</td>
+                              <td>{expo.expoType}</td>
+                              <td>{expo.stallType}</td>
+                              <td>{expo.stallNumber}</td>
+                              <td>{expo.expoCity}</td>
+                              <td>{formatDate(expo.bookingStartDate)}</td>
+                              <td>{formatDate(expo.bookingEndDate)}</td>
+                              <td>
+                                <Link to={`/stall/management/${expo.stallInfoId}`}>
+                                  <FaRegEdit />
+                                </Link>
+                              </td>
+                              <td>
+                                <Link to={`/expo/details/${expo.expoUnqCode}/${expo.stallInfoId}`}>
+                                  <span className='sta_iconn'>
+                                    <GoEye />
+                                  </span>
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                            :
+                            <tr>
+                              <td colSpan="7" className="text-center">No Data Found</td>
+                            </tr>
+                          }
                         </tbody>
                       </table>
                     </div>

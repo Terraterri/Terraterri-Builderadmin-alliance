@@ -6,6 +6,13 @@ import { IoSearch } from "react-icons/io5";
 import { GoEye } from "react-icons/go";
 import Loader from '../components/Loader';
 import { expoAdminClient } from '../utils/httpClient';
+import moment from 'moment';
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parsed = moment(dateStr, ['YYYY-MM-DD', 'DD-MM-YYYY', 'YYYY/MM/DD', 'YYYY-MM-DD HH:mm:ss']);
+  return parsed.isValid() ? parsed.format('DD-MM-YYYY') : dateStr;
+};
 
 const ViewDetails = () => {
   const { expoUnqCode, stallId } = useParams();
@@ -64,8 +71,8 @@ const ViewDetails = () => {
                       <li><span>ID</span> : {expoDetails?.newExpoId}</li>
                       <li><span>Expo Code </span> : {expoDetails?.expoUnqCode}</li>
                       <li><span>City </span> : {expoDetails?.expoCity}</li>
-                      <li><span>Date From </span> : {expoDetails?.fromDate}</li>
-                      <li><span>Date To	 </span> : {expoDetails?.toDate}	</li>
+                      <li><span>Date From </span> : {formatDate(expoDetails?.fromDate)}</li>
+                      <li><span>Date To	 </span> : {formatDate(expoDetails?.toDate)}	</li>
                       <li><span>Expo Type	</span> : {expoDetails?.expoType} </li>
                     </ul>
                   </div>
