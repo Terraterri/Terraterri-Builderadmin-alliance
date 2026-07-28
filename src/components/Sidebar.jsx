@@ -92,24 +92,7 @@ const Sidebars = () => {
     // },
 
 
-    {
-      label: <span className='icons_ot'> <SiMetasploit />PREMIUM PROPERTY LISTINGS</span>,
-      subMenu: [
-        {
-          label: 'Buy Packages',
-          url: '/packages/sale'
-        },
-        {
-          label: 'Packages Responses',
-          url: '/packages/sale-active'
-        },
-        {
-          label: 'Post New Project',
-          url: '/property/add'
-        },
-      ],
-      roles: ['Agent', 'Owner'],
-    },
+
 
     {
       label: <span className='icons_ot'><SiExpo /> AIRPROPX</span>,
@@ -122,14 +105,17 @@ const Sidebars = () => {
           label: 'Create Stall',
           url: '/expo/pending'
         },
-        // {
-        //   label: 'Future Expos',
-        //   url: '/expo/future'
-        // },
+
         {
           label: 'On Going Expos',
           url: '/expo/ongoing'
         },
+
+        {
+          label: 'Future Expos',
+          url: '/expo/future'
+        },
+
         {
           label: 'Completed Expos',
           url: '/expo/completed'

@@ -94,8 +94,8 @@ const FutureExpo = () => {
                             <th>Stall Type</th>
                             <th>Stall Number</th>
                             <th>City</th>
-                          <th>Month</th>
-                            <th>Year</th>
+                            <th>Stall Started Date</th>
+                            <th>Stall Ended Date</th>
                             <th>Edit</th>
                             <th>View</th>
                           </tr>
@@ -109,8 +109,8 @@ const FutureExpo = () => {
                               <td>{expo.stallType}</td>
                               <td>{expo.stallNumber}</td>
                               <td>{expo.expoCity}</td>
-                              <td>{expo.fromDate}</td>
-                              <td>{expo.toDate}</td>
+                              <td>{formatDate(expo.bookingStartDate)}</td>
+                              <td>{formatDate(expo.bookingEndDate)}</td>
                               <td>
                                 <Link to={`/stall/management/${expo.stallInfoId}`}>
                                   <FaRegEdit />

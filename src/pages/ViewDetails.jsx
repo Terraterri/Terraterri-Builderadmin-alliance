@@ -92,14 +92,14 @@ const ViewDetails = () => {
                           {VisitorsCount}
                         </Link>
                       </li>
-                      <li>
+                      {/* <li>
                         <span>E-Broucher Download</span>&nbsp;:&nbsp;
                         <Link to="/ebroucher">3000</Link>
                       </li>
                       <li>
                         <span>Enquiry</span>&nbsp;:&nbsp;
                         <Link to="/enquirylist">21</Link>
-                      </li>
+                      </li> */}
                     </ul>
                   </div>
                 </div>

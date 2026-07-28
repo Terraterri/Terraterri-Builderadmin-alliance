@@ -12,10 +12,18 @@ import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import { expoApiClient } from '../../utils/httpClient';
 import moment from 'moment';
+
+const formatTime = (timeStr) => {
+  if (!timeStr) return 'N/A';
+  const parsed = moment(timeStr, ['HH:mm:ss', 'YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm:ss']);
+  return parsed.isValid() ? parsed.format('hh:mm A') : timeStr;
+};
+
 const NoofExecutive = () => {
-  const { expoUnqCode, stallId } = useParams()
-  const [loading, setLoading] = useState(false)
-  const [analyticsData, setAnalyticsData] = useState([])
+  const { expoUnqCode, stallId } = useParams();
+  const [loading, setLoading] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState({});
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const [show, setShow] = useState(false);
   const [WhatsappShow, setWhatsappShow] = useState(false);
@@ -29,30 +37,49 @@ const NoofExecutive = () => {
     setEnquiryShow(false);
     setCommentShow(false);
     setDropMessageShow(false);
-  }
+    setSelectedUser(null);
+  };
 
-  const handleShow = () => setShow(true);
-  const handleWhatsapp = () => setWhatsappShow(true);
-
+  const handleShow = (user) => {
+    setSelectedUser(user);
+    setShow(true);
+  };
+  const handleWhatsapp = (user) => {
+    setSelectedUser(user);
+    setWhatsappShow(true);
+  };
+  const handleEnquiry = (user) => {
+    setSelectedUser(user);
+    setEnquiryShow(true);
+  };
+  const handleDropMessage = (user) => {
+    setSelectedUser(user);
+    setDropMessageShow(true);
+  };
+  const handleComment = (user) => {
+    setSelectedUser(user);
+    setCommentShow(true);
+  };
 
   const getExpoStallAnalytics = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await expoApiClient.get(`expoAnalytics/getStallCustomers.php?expoCode=${expoUnqCode}&stallId=${stallId}`)
+      const res = await expoApiClient.get(
+        `expoAnalytics/getStallCustomers.php?expoCode=${expoUnqCode}&stallId=${stallId}`
+      );
       if (res?.data?.success) {
-        setAnalyticsData(res?.data?.data)
+        setAnalyticsData(res?.data?.data || {});
       }
     } catch (error) {
-      console.log(error)
+      console.log(error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    getExpoStallAnalytics()
-  }, [])
-
+    getExpoStallAnalytics();
+  }, [expoUnqCode, stallId]);
 
   return (
     <>
@@ -68,77 +95,30 @@ const NoofExecutive = () => {
                       <li className="breadcrumb-item">
                         <a href="/">Home</a>
                       </li>
-                      <li className="breadcrumb-item active">No of Visitors Executive </li>
+                      <li className="breadcrumb-item active">No of Visitors Executive Wise</li>
                     </ol>
                   </div>
                 </div>
               </div>
             </div>
 
-            {Object.keys(analyticsData).length === 0 ? (
+            {!analyticsData || Object.keys(analyticsData).length === 0 ? (
               <div className="text-center mt-4">
-
-                      <div className="card-body">
-                          <div className="table-responsive-md">
-                            <table className="table text-nowrap mb-0">
-                              <thead>
-                                <tr>
-                                  <th>S.no</th>
-                                  <th>Visitor Name</th>
-                                  <th>Mobile Number</th>
-                                  <th>Email Id</th>
-                                  <th>Joined At</th>
-                                  <th>Activity</th>
-                                  <th>Comments</th>
-                                </tr>
-                              </thead>
-                              {/* <tbody>
-                                {exec.users.length === 0 ? (
-                                  <tr>
-                                    <td colSpan="7" className="text-center">No users found</td>
-                                  </tr>
-                                ) : (
-                                  exec.users.map((user, idx) => (
-                                    <tr key={user.userId}>
-                                      <td>{idx + 1}</td>
-                                      <td>{user.name}</td>
-                                      <td>{user.number}</td>
-                                      <td>{user.email}</td>
-                                      <td>{moment(user.joined_at, "HH:mm:ss").format("hh:mm A")}</td>
-                                      <td>
-                                        <span className='icons_list'>
-                                          <Button variant="primary" onClick={handleShow} className='listin_btn'><FaFileDownload /></Button>
-                                          <Button variant="primary" onClick={handleWhatsapp} className='listin_btn'><MdWhatsapp /></Button>
-                                          <Button variant="primary" onClick={setEnquiryShow} className='listin_btn'><PiNote /></Button>
-                                          <Button variant="primary" onClick={setDropMessageShow} className='listin_btn'><RiMessage2Fill /></Button>
-                                        </span>
-                                      </td>
-                                      <td>
-                                        <span className='sta_iconn'>
-                                          <Button variant="primary" onClick={setCommentShow} className='listin_btn'><GoEye /></Button>
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody> */}
-                            </table>
-                          </div>
-                        </div>
-                <h5 className="text-center mt-5" >No data available</h5>
+                <h5 className="mt-5">No data available</h5>
               </div>
             ) : (
               Object.entries(analyticsData).map(([date, executives], dayIndex) =>
+                Array.isArray(executives) &&
                 executives.map((exec, execIndex) => (
-                  <div className="row justify-content-center mt-4" key={`${date}-${exec.executiveId}`}>
+                  <div className="row justify-content-center mt-4" key={`${date}-${exec.executiveId || execIndex}`}>
                     <div className="col-md-12">
                       <div className="card">
                         <div className="card-header card-header-e2">
-                          <h3 className="card-title">Table - {exec.tableId}</h3>
+                          <h3 className="card-title">Table - {exec.tableId || exec.table_id || 'N/A'}</h3>
                           <h3 className="card-title">
                             Day-{dayIndex + 1} ({new Date(date).toLocaleDateString('en-GB')})
                           </h3>
-                          <h3 className="card-title">{exec.executive_name}</h3>
+                          <h3 className="card-title">{exec.executive_name || exec.executiveName || 'Executive'}</h3>
                         </div>
                         <div className="card-body">
                           <div className="table-responsive-md">
@@ -154,36 +134,36 @@ const NoofExecutive = () => {
                                   <th>Comments</th>
                                 </tr>
                               </thead>
-                              {/* <tbody>
-                                {exec.users.length === 0 ? (
+                              <tbody>
+                                {!exec.users || exec.users.length === 0 ? (
                                   <tr>
                                     <td colSpan="7" className="text-center">No users found</td>
                                   </tr>
                                 ) : (
                                   exec.users.map((user, idx) => (
-                                    <tr key={user.userId}>
+                                    <tr key={user.userId || idx}>
                                       <td>{idx + 1}</td>
-                                      <td>{user.name}</td>
-                                      <td>{user.number}</td>
-                                      <td>{user.email}</td>
-                                      <td>{moment(user.joined_at, "HH:mm:ss").format("hh:mm A")}</td>
+                                      <td>{user.name || 'N/A'}</td>
+                                      <td>{user.number || 'N/A'}</td>
+                                      <td>{user.email || 'N/A'}</td>
+                                      <td>{formatTime(user.joined_at)}</td>
                                       <td>
                                         <span className='icons_list'>
-                                          <Button variant="primary" onClick={handleShow} className='listin_btn'><FaFileDownload /></Button>
-                                          <Button variant="primary" onClick={handleWhatsapp} className='listin_btn'><MdWhatsapp /></Button>
-                                          <Button variant="primary" onClick={setEnquiryShow} className='listin_btn'><PiNote /></Button>
-                                          <Button variant="primary" onClick={setDropMessageShow} className='listin_btn'><RiMessage2Fill /></Button>
+                                          <Button variant="primary" onClick={() => handleShow(user)} className='listin_btn'><FaFileDownload /></Button>
+                                          <Button variant="primary" onClick={() => handleWhatsapp(user)} className='listin_btn'><MdWhatsapp /></Button>
+                                          <Button variant="primary" onClick={() => handleEnquiry(user)} className='listin_btn'><PiNote /></Button>
+                                          <Button variant="primary" onClick={() => handleDropMessage(user)} className='listin_btn'><RiMessage2Fill /></Button>
                                         </span>
                                       </td>
                                       <td>
                                         <span className='sta_iconn'>
-                                          <Button variant="primary" onClick={setCommentShow} className='listin_btn'><GoEye /></Button>
+                                          <Button variant="primary" onClick={() => handleComment(user)} className='listin_btn'><GoEye /></Button>
                                         </span>
                                       </td>
                                     </tr>
                                   ))
                                 )}
-                              </tbody> */}
+                              </tbody>
                             </table>
                           </div>
                         </div>
@@ -193,8 +173,6 @@ const NoofExecutive = () => {
                 ))
               )
             )}
-
-
 
             {/*-------- Broucher-popup starts-------- */}
             <Modal show={show} onHide={handleClose}>
@@ -216,10 +194,19 @@ const NoofExecutive = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              <tr>
-                                <td>1</td>
-                                <td>Maa Srinivasan</td>
-                              </tr>
+                              {selectedUser?.brochures && selectedUser.brochures.length > 0 ? (
+                                selectedUser.brochures.map((b, i) => (
+                                  <tr key={i}>
+                                    <td>{i + 1}</td>
+                                    <td>{b.projectName || b.name || b}</td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td>1</td>
+                                  <td>{selectedUser?.projectName || selectedUser?.ebroucher || 'Maa Srinivasan'}</td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -238,7 +225,7 @@ const NoofExecutive = () => {
                   <div className="col-md-12">
                     <div className="card">
                       <div className="card-header">
-                        <h3 className="card-title">Whatsup Callss</h3>
+                        <h3 className="card-title">WhatsApp Calls</h3>
                       </div>
                       <div className="card-body">
                         <div className="table-responsive-md">
@@ -253,13 +240,25 @@ const NoofExecutive = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              <tr>
-                                <td>1</td>
-                                <td>WE1</td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                              </tr>
+                              {selectedUser?.whatsappCalls && selectedUser.whatsappCalls.length > 0 ? (
+                                selectedUser.whatsappCalls.map((call, idx) => (
+                                  <tr key={idx}>
+                                    <td>{idx + 1}</td>
+                                    <td>{call.executive || selectedUser.executive_name || 'WE1'}</td>
+                                    <td>{call.name || selectedUser.name || 'N/A'}</td>
+                                    <td>{call.time || 'N/A'}</td>
+                                    <td>{call.duration || 'N/A'}</td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td>1</td>
+                                  <td>{selectedUser?.executive_name || 'WE1'}</td>
+                                  <td>{selectedUser?.name || 'N/A'}</td>
+                                  <td>{formatTime(selectedUser?.joined_at)}</td>
+                                  <td>{selectedUser?.duration || 'N/A'}</td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -278,7 +277,7 @@ const NoofExecutive = () => {
                   <div className="col-md-12">
                     <div className="card">
                       <div className="card-header">
-                        <h3 className="card-title">Enqiry</h3>
+                        <h3 className="card-title">Enquiry</h3>
                       </div>
                       <div className="card-body">
                         <div className="table-responsive-md">
@@ -290,10 +289,19 @@ const NoofExecutive = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              <tr>
-                                <td>1</td>
-                                <td>Maa Srinivasan</td>
-                              </tr>
+                              {selectedUser?.enquiries && selectedUser.enquiries.length > 0 ? (
+                                selectedUser.enquiries.map((enq, idx) => (
+                                  <tr key={idx}>
+                                    <td>{idx + 1}</td>
+                                    <td>{enq.projectName || enq}</td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td>1</td>
+                                  <td>{selectedUser?.enquiryProject || selectedUser?.projectName || 'Maa Srinivasan'}</td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -316,7 +324,7 @@ const NoofExecutive = () => {
                       </div>
                       <div className="card-body">
                         <div className='drop_text w-50 m-auto text-justify'>
-                          <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sapien neque, euismod suscipit eleifend quis, mollis in ante. Donec imperdiet risus quis lorem lobortis, vel euismod justo dictum. Vestibulum congue mattis interdum. Praesent sit amet diam a velit consequat commodo quis placerat eros.</p>
+                          <p>{selectedUser?.dropMessage || selectedUser?.message || 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sapien neque, euismod suscipit eleifend quis, mollis in ante. Donec imperdiet risus quis lorem lobortis, vel euismod justo dictum. Vestibulum congue mattis interdum. Praesent sit amet diam a velit consequat commodo quis placerat eros.'}</p>
                         </div>
                       </div>
                     </div>
@@ -337,7 +345,7 @@ const NoofExecutive = () => {
                       </div>
                       <div className="card-body">
                         <div className='drop_text w-50 m-auto text-justify'>
-                          <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sapien neque, euismod suscipit eleifend quis, mollis in ante. Donec imperdiet risus quis lorem lobortis, vel euismod justo dictum. Vestibulum congue mattis interdum. Praesent sit amet diam a velit consequat commodo quis placerat eros.</p>
+                          <p>{selectedUser?.comments || selectedUser?.comment || 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sapien neque, euismod suscipit eleifend quis, mollis in ante. Donec imperdiet risus quis lorem lobortis, vel euismod justo dictum. Vestibulum congue mattis interdum. Praesent sit amet diam a velit consequat commodo quis placerat eros.'}</p>
                         </div>
                       </div>
                     </div>
@@ -350,7 +358,7 @@ const NoofExecutive = () => {
         </div>
       </div>
     </>
-  )
-}
+  );
+};
 
-export default NoofExecutive
+export default NoofExecutive;

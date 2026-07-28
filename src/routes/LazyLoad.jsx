@@ -81,8 +81,8 @@ const LazyLoad = () => {
   const ModelDashboard = lazy(() => import(`../pages/ModelHouse/ModelDashboard`));
   const AssignExeone = lazy(() => import(`../pages/ModelHouse/AssignExeone`));
   const AssignExetwo = lazy(() => import(`../pages/ModelHouse/AssignExetwo`));
- 
- 
+
+
   const MasterProjectsname = lazy(() => import(`../pages/MasterProjectslists/MasterProjectsname`));
   const MasterProjectslist = lazy(() => import(`../pages/MasterProjectslists/MasterProjectslist`));
   const MasteractiveProjects = lazy(() => import(`../pages/MasterProjectslists/MasteractiveProjects`));
@@ -159,7 +159,7 @@ const LazyLoad = () => {
 
         {/*  Pages to implement  */}
         {/* <Route path="/noofexecutiveswise/:expoUnqCode/:stallId" element={<NoofExecutive />} /> */}
-        <Route path="/noofexecutiveswise" element={<NoofExecutive />} />
+        <Route path="/noofexecutiveswise/:expoUnqCode/:stallId" element={<NoofExecutive />} />
         <Route path="/ebroucher" element={<Ebroucher />} />
         <Route path="/dropmessage" element={<DropMessage />} />
         <Route path="/enquirylist" element={<EnquiryList />} />
