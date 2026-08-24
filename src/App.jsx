@@ -1,4 +1,5 @@
 import { useState, useEffect, } from "react";
+import { environment } from "./utils/environment";
 import "./App.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -79,7 +80,7 @@ function App() {
       if (!userIp) return;
 
       // Step 2: Call terraterri ipgeo API with the IP
-      const response = await fetch(`https://nodeapi.terraterri.com/api/ipgeo?ip=${userIp}`);
+      const response = await fetch(`${environment.websiteEndPoint}/api/ipgeo?ip=${userIp}`);
       const data = await response.json();
       if (data) {
         setIpInfo(data);
