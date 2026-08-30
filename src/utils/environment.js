@@ -4,5 +4,7 @@ export const environment = {
   mastersEndPoint: import.meta.env.VITE_MASTERS_ENDPOINT,
   websiteEndPoint: import.meta.env.VITE_WEBSITE_ENDPOINT,
   expoAdminEndPoint: import.meta.env.VITE_EXPOADMIN_ENDPOINT,
-  expoApiEndPoint: import.meta.env.VITE_EXPOAPI_ENDPOINT
+  expoApiEndPoint: import.meta.env.VITE_EXPOAPI_ENDPOINT,
+  // Razorpay PUBLISHABLE key (safe in a browser bundle); injected at build time.
+  razorpayApiKey: import.meta.env.VITE_RAZOR_API_KEY
 };

@@ -37,7 +37,14 @@ jobs:
             echo "node=https://dev.nodeapi.terraterri.com"
             echo "expoadmin=https://dev.expoadminapi.terraterri.com"
             echo "self=https://dev.builderalliance.terraterri.com"
+            echo "razor=$(gcloud secrets versions access latest --secret=dev-razorpay-key-id)"
           } >> "$GITHUB_OUTPUT"
+          # Fail fast: an empty publishable key builds a UI whose Razorpay
+          # checkout cannot open ("Failed to initiate payment").
+          if ! grep -q '^razor=rzp_' "$GITHUB_OUTPUT"; then
+            echo "::error::Razorpay publishable key not resolved. Aborting."
+            exit 1
+          fi
 
       - name: Build & push (Vite build-args)
         run: |
@@ -49,6 +56,7 @@ jobs:
             --build-arg "VITE_EXPOADMIN_ENDPOINT=${{ steps.u.outputs.expoadmin }}/" \
             --build-arg "VITE_EXPOAPI_ENDPOINT=${{ steps.u.outputs.expoadmin }}/tt-expo-builder-be/" \
             --build-arg "VITE_BASE_URL=${{ steps.u.outputs.self }}/" \
+            --build-arg "VITE_RAZOR_API_KEY=${{ steps.u.outputs.razor }}" \
             .
           docker push "${AR}/${IMAGE}"
 
