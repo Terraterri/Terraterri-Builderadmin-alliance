@@ -326,7 +326,7 @@ const Register = () => {
 
     try {
       setLoading(true);
-      const { data } = await api.registerRequestOtp({ mobile: form.mobile });
+      const { data } = await api.registerRequestOtp({ mobile: form.mobile, role: 2 });
       if (data?.code === 200) {
         toastSuccess('OTP sent to your mobile number');
         setOtpSent(true);
@@ -372,7 +372,7 @@ const Register = () => {
     if (!form.mobile) return;
     try {
       setLoading(true);
-      const { data } = await api.requestOtp({ mobile: form.mobile });
+      const { data } = await api.registerRequestOtp({ mobile: form.mobile, role: 2 });
       if (data?.code === 200) {
         toastSuccess('New OTP sent successfully!');
         setOtp(Array(6).fill(''));

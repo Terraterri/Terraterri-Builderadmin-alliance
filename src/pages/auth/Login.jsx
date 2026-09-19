@@ -105,7 +105,8 @@ const Login = () => {
     try {
       dispatch({ type: "SET_LOADER", loader: true });
       const { data } = await websiteClient.post('otp/request-otp', {
-        mobile: state.loginForm.mobile
+        mobile: state.loginForm.mobile,
+        role: 2
       });
 
       if (data?.code === 200) {
@@ -163,7 +164,8 @@ const Login = () => {
     try {
       dispatch({ type: "SET_LOADER", loader: true });
       const { data } = await websiteClient.post('otp/request-otp', {
-        mobile: state.loginForm.mobile
+        mobile: state.loginForm.mobile,
+        role: 2
       });
 
       if (data?.code === 200) {
@@ -290,7 +292,7 @@ const Login = () => {
           </div>
           <div className="login-bg">
             <Link to="https://terraterri.com/">
-<h2>Builder Logo</h2>
+              <h2>Builder Logo</h2>
             </Link>
             <div className="loginInner">
               <div className="row align-items-center justify-content-center">
