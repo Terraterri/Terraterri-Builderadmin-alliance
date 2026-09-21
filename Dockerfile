@@ -25,6 +25,15 @@ ENV VITE_RAZOR_API_KEY=$VITE_RAZOR_API_KEY
 
 RUN npm run build
 
+
+# Optional build-time assertion. When EXPECT_HOST is supplied the build fails
+# unless that string appears in the compiled bundle. The dev pipeline passes
+# EXPECT_HOST=dev. so a build that silently fell back to the PROD ARG defaults
+# above can never reach the dev environment. Prod passes nothing, so this is a
+# no-op there and the existing prod pipeline is completely unaffected.
+ARG EXPECT_HOST=
+RUN if [ -n "$EXPECT_HOST" ]; then       grep -rq "$EXPECT_HOST" dist/assets/         || (echo "ERROR: expected host '$EXPECT_HOST' missing from the built bundle" && exit 1);       echo "build guard OK: '$EXPECT_HOST' found in bundle";     fi
+
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/templates/default.conf.template

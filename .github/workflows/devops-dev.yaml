@@ -41,8 +41,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           # Fail fast: an empty publishable key builds a UI whose Razorpay
           # checkout cannot open ("Failed to initiate payment").
-          if ! grep -q '^razor=rzp_' "$GITHUB_OUTPUT"; then
-            echo "::error::Razorpay publishable key not resolved. Aborting."
+          if ! grep -q '^razor=rzp_test_' "$GITHUB_OUTPUT"; then
+            echo "::error::Razorpay key is not a rzp_test_ sandbox key. Aborting before a LIVE key reaches dev."
             exit 1
           fi
 
@@ -57,6 +57,7 @@ jobs:
             --build-arg "VITE_EXPOAPI_ENDPOINT=${{ steps.u.outputs.expoadmin }}/tt-expo-builder-be/" \
             --build-arg "VITE_BASE_URL=${{ steps.u.outputs.self }}/" \
             --build-arg "VITE_RAZOR_API_KEY=${{ steps.u.outputs.razor }}" \
+            --build-arg "EXPECT_HOST=dev.micro-api-one.terraterri.com" \
             .
           docker push "${AR}/${IMAGE}"
 
